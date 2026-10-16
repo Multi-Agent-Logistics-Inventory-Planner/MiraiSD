@@ -15,7 +15,7 @@ import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.inventory.application.InventoryQueries;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
+import com.mirai.inventoryservice.displays.application.DisplayQueries;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -60,7 +60,7 @@ class AnalyticsServiceTest {
     private DailySalesRollupRepository dailySalesRollupRepository;
 
     @Mock
-    private MachineDisplayRepository machineDisplayRepository;
+    private DisplayQueries displayQueries;
 
     @InjectMocks
     private AnalyticsService analyticsService;
@@ -124,8 +124,8 @@ class AnalyticsServiceTest {
                     .thenReturn(List.of(ProductRef.from(product)));
             when(catalogQueries.allCategoryRefs())
                     .thenReturn(List.of(CategoryRef.from(category)));
-            when(machineDisplayRepository.calculateDisplayDaysByProduct(any(), any()))
-                    .thenReturn(Collections.emptyList());
+            when(displayQueries.displayDaysByProduct(any(), any()))
+                    .thenReturn(Collections.emptyMap());
 
             analyticsService.getInsights();
 
@@ -145,8 +145,8 @@ class AnalyticsServiceTest {
                     .thenReturn(Collections.emptyList());
             when(catalogQueries.allCategoryRefs())
                     .thenReturn(Collections.emptyList());
-            when(machineDisplayRepository.calculateDisplayDaysByProduct(any(), any()))
-                    .thenReturn(Collections.emptyList());
+            when(displayQueries.displayDaysByProduct(any(), any()))
+                    .thenReturn(Collections.emptyMap());
 
             InsightsDTO result = analyticsService.getInsights();
 

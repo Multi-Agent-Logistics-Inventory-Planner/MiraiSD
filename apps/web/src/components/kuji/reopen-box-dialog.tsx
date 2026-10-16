@@ -41,7 +41,6 @@ export function ReopenBoxDialog({
     try {
       await reopenBox.mutateAsync({
         boxId: box.id,
-        actorId,
         productId: box.productId,
       });
       toast({ title: "Box reopened", variant: "success" });

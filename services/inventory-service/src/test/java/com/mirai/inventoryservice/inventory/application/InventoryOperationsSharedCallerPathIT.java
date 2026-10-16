@@ -5,20 +5,20 @@ import com.mirai.inventoryservice.catalog.domain.KujiType;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
-import com.mirai.inventoryservice.dtos.requests.ReceiveShipmentRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.ShipmentItemRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.ShipmentRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.CloseKujiBoxRequestDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.NewKujiBoxTierDTO;
-import com.mirai.inventoryservice.dtos.requests.kuji.OpenKujiBoxRequestDTO;
-import com.mirai.inventoryservice.dtos.responses.kuji.KujiBoxResponseDTO;
+import com.mirai.inventoryservice.shipments.api.ReceiveShipmentRequestDTO;
+import com.mirai.inventoryservice.shipments.api.ShipmentItemRequestDTO;
+import com.mirai.inventoryservice.shipments.api.ShipmentRequestDTO;
+import com.mirai.inventoryservice.kuji.api.CloseKujiBoxRequestDTO;
+import com.mirai.inventoryservice.kuji.api.NewKujiBoxTierDTO;
+import com.mirai.inventoryservice.kuji.api.OpenKujiBoxRequestDTO;
+import com.mirai.inventoryservice.kuji.api.KujiBoxResponseDTO;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
-import com.mirai.inventoryservice.models.shipment.Shipment;
-import com.mirai.inventoryservice.services.KujiBoxService;
-import com.mirai.inventoryservice.services.ShipmentService;
+import com.mirai.inventoryservice.shipments.domain.Shipment;
+import com.mirai.inventoryservice.kuji.application.KujiBoxService;
+import com.mirai.inventoryservice.shipments.application.ShipmentService;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
@@ -129,7 +129,7 @@ class InventoryOperationsSharedCallerPathIT {
         assertThat(locationInventoryRepository.findByLocation_IdAndProduct_Id(destination.getId(), product.getId()))
                 .isEmpty();
 
-        Shipment shipment = shipmentService.createShipment(ShipmentRequestDTO.builder()
+        Shipment shipment = shipmentService.createShipment(site.getId(), ShipmentRequestDTO.builder()
                 .shipmentNumber("SHARED-SHIP-" + suffix)
                 .status(ShipmentStatus.PENDING)
                 .orderDate(LocalDate.now())
@@ -142,7 +142,7 @@ class InventoryOperationsSharedCallerPathIT {
 
         // Receive: no LocationInventory row exists yet at `destination` -- addToInventory must
         // find-or-create one, not assume it already exists.
-        shipmentService.receiveShipment(shipment.getId(), ReceiveShipmentRequestDTO.builder()
+        shipmentService.receiveShipment(site.getId(), shipment.getId(), ReceiveShipmentRequestDTO.builder()
                 .actualDeliveryDate(LocalDate.now())
                 .itemReceipts(List.of(ReceiveShipmentRequestDTO.ItemReceiptDTO.builder()
                         .shipmentItemId(shipmentItemId)
@@ -161,7 +161,7 @@ class InventoryOperationsSharedCallerPathIT {
 
         // Undo the full receipt: removeFromInventory must delete the row once it drains to zero,
         // not leave a zero-quantity row behind.
-        shipmentService.undoReceiveShipmentItem(shipment.getId(), shipmentItemId, null, "Test Actor");
+        shipmentService.undoReceiveShipmentItem(site.getId(), shipment.getId(), shipmentItemId, null, "Test Actor");
 
         Optional<LocationInventory> afterUndo = locationInventoryRepository
                 .findByLocation_IdAndProduct_Id(destination.getId(), product.getId());
@@ -190,7 +190,7 @@ class InventoryOperationsSharedCallerPathIT {
                 .isEmpty();
 
         UUID actorId = UUID.randomUUID();
-        KujiBoxResponseDTO opened = kujiBoxService.openBox(OpenKujiBoxRequestDTO.builder()
+        KujiBoxResponseDTO opened = kujiBoxService.openBox(site.getId(), OpenKujiBoxRequestDTO.builder()
                 .productId(parentProduct.getId())
                 .locationId(boxLocation.getId())
                 .actorId(actorId)
@@ -210,7 +210,7 @@ class InventoryOperationsSharedCallerPathIT {
 
         UUID tierId = opened.getTiers().get(0).getId();
 
-        kujiBoxService.closeBox(opened.getId(), CloseKujiBoxRequestDTO.builder()
+        kujiBoxService.closeBox(site.getId(), opened.getId(), CloseKujiBoxRequestDTO.builder()
                 .actorId(actorId)
                 .transferOutTargets(List.of(CloseKujiBoxRequestDTO.TierTransferDestination.builder()
                         .tierId(tierId)

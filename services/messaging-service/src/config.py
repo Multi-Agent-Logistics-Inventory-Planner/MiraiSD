@@ -62,3 +62,7 @@ REVIEW_FETCH_HOUR = int(os.getenv("REVIEW_FETCH_HOUR", "6"))
 REVIEW_MAX_REVIEWS = int(os.getenv("REVIEW_MAX_REVIEWS", "50"))
 APP_TIMEZONE = os.getenv("APP_TIMEZONE", "America/New_York")
 
+# Site that GOOGLE_PLACE_URL's reviews are attributed to. Config-driven rather than
+# hardcoded so a second review source/site pairing can be added without a code change.
+REVIEW_SITE_CODE = os.getenv("REVIEW_SITE_CODE", "MAIN")
+

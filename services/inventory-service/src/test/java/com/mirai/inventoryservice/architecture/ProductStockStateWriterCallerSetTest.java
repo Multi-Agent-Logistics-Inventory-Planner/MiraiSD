@@ -42,7 +42,7 @@ class ProductStockStateWriterCallerSetTest {
     private static Set<String> expectedOrigins() {
         Set<String> expected = new HashSet<>();
         expected.add("com.mirai.inventoryservice.inventory.application.StockMovementService");
-        expected.add("com.mirai.inventoryservice.services.KujiBoxService");
+        expected.add("com.mirai.inventoryservice.kuji.application.KujiBoxService");
         return expected;
     }
 

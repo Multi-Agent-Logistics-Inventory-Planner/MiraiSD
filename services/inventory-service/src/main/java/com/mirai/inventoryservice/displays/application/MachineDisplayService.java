@@ -1,0 +1,1444 @@
+package com.mirai.inventoryservice.displays.application;
+
+import com.mirai.inventoryservice.displays.api.BatchClearDisplaysRequestDTO;
+import com.mirai.inventoryservice.displays.api.BatchDisplaySwapRequestDTO;
+import com.mirai.inventoryservice.displays.api.RenewDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.api.SetMachineDisplayBatchRequestDTO;
+import com.mirai.inventoryservice.displays.api.SetMachineDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.api.SwapMachineDisplayRequestDTO;
+import com.mirai.inventoryservice.displays.api.MachineDisplayDTO;
+import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
+import com.mirai.inventoryservice.displays.domain.MachineDisplay;
+import com.mirai.inventoryservice.catalog.domain.Product;
+import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.models.audit.Notification;
+import com.mirai.inventoryservice.inventory.domain.StockMovement;
+import com.mirai.inventoryservice.models.enums.LocationType;
+import com.mirai.inventoryservice.models.enums.NotificationSeverity;
+import com.mirai.inventoryservice.models.enums.NotificationType;
+import com.mirai.inventoryservice.models.enums.StockMovementReason;
+import com.mirai.inventoryservice.sites.domain.Location;
+import com.mirai.inventoryservice.sites.application.LocationService;
+import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
+import com.mirai.inventoryservice.catalog.application.CatalogQueries;
+import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
+import com.mirai.inventoryservice.catalog.application.ProductRef;
+import com.mirai.inventoryservice.inventory.application.InventoryOperations;
+import com.mirai.inventoryservice.identity.application.UserService;
+import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.services.NotificationService;
+import jakarta.persistence.EntityManager;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.OffsetDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+@Service
+@Slf4j
+public class MachineDisplayService {
+    private final MachineDisplayRepository machineDisplayRepository;
+    private final CatalogQueries catalogQueries;
+    private final CatalogEntityAccess catalogEntityAccess;
+    private final UserService userService;
+    private final InventoryOperations inventoryOperations;
+    private final LocationService locationService;
+    private final EntityManager entityManager;
+    private final AuditLogService auditLogService;
+    private final NotificationService notificationService;
+
+    @Value("${machine-display.stale-threshold-days:45}")
+    private int staleThresholdDays;
+
+    public MachineDisplayService(
+            MachineDisplayRepository machineDisplayRepository,
+            CatalogQueries catalogQueries,
+            CatalogEntityAccess catalogEntityAccess,
+            UserService userService,
+            InventoryOperations inventoryOperations,
+            LocationService locationService,
+            EntityManager entityManager,
+            AuditLogService auditLogService,
+            NotificationService notificationService) {
+        this.machineDisplayRepository = machineDisplayRepository;
+        this.catalogQueries = catalogQueries;
+        this.catalogEntityAccess = catalogEntityAccess;
+        this.userService = userService;
+        this.inventoryOperations = inventoryOperations;
+        this.locationService = locationService;
+        this.entityManager = entityManager;
+        this.auditLogService = auditLogService;
+        this.notificationService = notificationService;
+    }
+
+    /**
+     * Add a product to a machine's display.
+     * Allows multiple products per machine (does not close existing displays).
+     */
+    @Transactional
+    public MachineDisplay setDisplay(SetMachineDisplayRequestDTO request) {
+        ProductRef product = catalogQueries.findById(request.getProductId())
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + request.getProductId()));
+
+        List<MachineDisplay> existingDisplays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+
+        boolean alreadyDisplayed = existingDisplays.stream()
+                .anyMatch(d -> d.getProduct().getId().equals(request.getProductId()));
+
+        if (alreadyDisplayed) {
+            throw new IllegalArgumentException("Product is already displayed on this machine");
+        }
+
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationService.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
+        OffsetDateTime now = OffsetDateTime.now();
+        MachineDisplay newDisplay = MachineDisplay.builder()
+                .location(location)
+                .locationType(request.getLocationType())
+                .machineId(request.getMachineId())
+                .product(catalogEntityAccess.getReference(product.id()))
+                .startedAt(now)
+                .actorId(request.getActorId())
+                .site(location.getStorageLocation().getSite())
+                .build();
+
+        MachineDisplay saved = machineDisplayRepository.save(newDisplay);
+
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        AuditLog auditLog = auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SET,
+                null, null,
+                request.getMachineId(), machineCode,
+                1, 0,
+                product.name(),
+                null
+        );
+
+        // Create StockMovement entry for the display set
+        StockMovement movement = StockMovement.builder()
+                .auditLog(auditLog)
+                .item(catalogEntityAccess.getReference(product.id()))
+                .locationType(request.getLocationType())
+                .fromLocationId(null)
+                .toLocationId(request.getMachineId())
+                .previousQuantity(0)
+                .currentQuantity(0)
+                .quantityChange(0)
+                .reason(StockMovementReason.DISPLAY_SET)
+                .actorId(request.getActorId())
+                .at(now)
+                .site(location.getStorageLocation().getSite())
+                .build();
+        inventoryOperations.saveMovement(movement);
+
+        List<String> previousNames = existingDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        List<String> currentNames = new ArrayList<>(previousNames);
+        currentNames.add(product.name());
+        emitDisplayNotification(
+                NotificationType.DISPLAY_SET,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
+        );
+
+        return saved;
+    }
+
+    /**
+     * Add multiple products to a machine's display in a single transaction.
+     * Skips products that are already displayed (does not throw error).
+     * Returns the list of newly created displays.
+     */
+    @Transactional
+    public List<MachineDisplay> setDisplayBatch(SetMachineDisplayBatchRequestDTO request) {
+        if (request.getProductIds().isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Get existing active displays for this machine (1 query)
+        List<MachineDisplay> existingDisplays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+
+        Set<UUID> existingProductIds = existingDisplays.stream()
+                .map(d -> d.getProduct().getId())
+                .collect(Collectors.toSet());
+
+        // Filter out already displayed products and duplicates in request
+        List<UUID> newProductIds = request.getProductIds().stream()
+                .distinct()
+                .filter(id -> !existingProductIds.contains(id))
+                .collect(Collectors.toList());
+
+        if (newProductIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Batch fetch all products (1 query instead of N)
+        Map<UUID, ProductRef> productsById = catalogQueries.findAllByIds(newProductIds).stream()
+                .collect(Collectors.toMap(ProductRef::id, p -> p));
+
+        // Validate all products exist
+        for (UUID productId : newProductIds) {
+            if (!productsById.containsKey(productId)) {
+                throw new IllegalArgumentException("Product not found: " + productId);
+            }
+        }
+
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationService.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
+        // Build all display entities
+        OffsetDateTime now = OffsetDateTime.now();
+        List<MachineDisplay> newDisplays = newProductIds.stream()
+                .map(productId -> MachineDisplay.builder()
+                        .location(location)
+                        .locationType(request.getLocationType())
+                        .machineId(request.getMachineId())
+                        .product(catalogEntityAccess.getReference(productId))
+                        .startedAt(now)
+                        .actorId(request.getActorId())
+                        .site(location.getStorageLocation().getSite())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<MachineDisplay> saved = machineDisplayRepository.saveAll(newDisplays);
+
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        List<String> productNames = newProductIds.stream()
+                .map(id -> productsById.get(id).name())
+                .collect(Collectors.toList());
+        AuditLog auditLog = auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SET,
+                null, null,
+                request.getMachineId(), machineCode,
+                productNames.size(), 0,
+                buildProductSummary(productNames),
+                null
+        );
+
+        // Create StockMovement entries for each product added (batch insert)
+        List<StockMovement> movements = newProductIds.stream()
+                .map(productId -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(catalogEntityAccess.getReference(productId))
+                        .locationType(request.getLocationType())
+                        .fromLocationId(null)
+                        .toLocationId(request.getMachineId())
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_SET)
+                        .actorId(request.getActorId())
+                        .at(now)
+                        .site(location.getStorageLocation().getSite())
+                        .build())
+                .collect(Collectors.toList());
+        inventoryOperations.saveMovements(movements);
+
+        List<String> previousNames = existingDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        List<String> currentNames = new ArrayList<>(previousNames);
+        currentNames.addAll(productNames);
+        emitDisplayNotification(
+                NotificationType.DISPLAY_SET,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
+        );
+
+        return saved;
+    }
+
+    /**
+     * Clear all displays for a machine (end all active displays)
+     */
+    @Transactional
+    public void clearDisplay(LocationType locationType, UUID machineId, UUID actorId) {
+        List<MachineDisplay> existingDisplays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(locationType, machineId);
+
+        if (existingDisplays.isEmpty()) {
+            return;
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        existingDisplays.forEach(display -> display.setEndedAt(now));
+        machineDisplayRepository.saveAll(existingDisplays);
+
+        String machineCode = resolveLocationCode(machineId, locationType);
+        List<String> productNames = existingDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        AuditLog auditLog = auditLogService.createAuditLog(
+                actorId,
+                StockMovementReason.DISPLAY_REMOVED,
+                machineId, machineCode,
+                null, null,
+                productNames.size(), 0,
+                buildProductSummary(productNames),
+                null
+        );
+
+        // Create StockMovement entries for each product removed (batch insert)
+        List<StockMovement> movements = existingDisplays.stream()
+                .map(display -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(display.getProduct())
+                        .locationType(locationType)
+                        .fromLocationId(machineId)
+                        .toLocationId(null)
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_REMOVED)
+                        .actorId(actorId)
+                        .at(now)
+                        .site(display.getLocation().getStorageLocation().getSite())
+                        .build())
+                .collect(Collectors.toList());
+        inventoryOperations.saveMovements(movements);
+
+        emitDisplayNotification(
+                NotificationType.DISPLAY_REMOVED,
+                actorId,
+                now,
+                List.of(new MachineSnapshot(machineCode, productNames, List.of()))
+        );
+    }
+
+    /**
+     * Clear a specific display by ID. Delegates to {@link #batchClearDisplays} with a
+     * single-element list so that single and bulk clears share one code path.
+     */
+    @Transactional
+    public void clearDisplayById(UUID displayId, UUID actorId) {
+        batchClearDisplays(BatchClearDisplaysRequestDTO.builder()
+                .displayIds(List.of(displayId))
+                .actorId(actorId)
+                .build());
+    }
+
+    /**
+     * Batch-clear multiple displays on the same machine in one transaction.
+     * Produces a single audit log entry, one batched StockMovement insert, and one notification.
+     * All displayIds must belong to the same (locationType, machineId); cross-machine batches
+     * are rejected — use batchSwapDisplay for cross-machine operations.
+     *
+     * Returns the remaining active displays on the machine after the clear.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> batchClearDisplays(BatchClearDisplaysRequestDTO request) {
+        List<UUID> displayIds = request.getDisplayIds().stream().distinct().collect(Collectors.toList());
+
+        // Single query to load all displays with their products
+        List<MachineDisplay> displays = machineDisplayRepository.findAllByIdInWithProduct(displayIds);
+
+        if (displays.size() != displayIds.size()) {
+            Set<UUID> found = displays.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
+            UUID missing = displayIds.stream().filter(id -> !found.contains(id)).findFirst().orElse(null);
+            throw new IllegalArgumentException("Display not found: " + missing);
+        }
+
+        MachineDisplay first = displays.get(0);
+        LocationType locationType = first.getLocationType();
+        UUID machineId = first.getMachineId();
+
+        for (MachineDisplay display : displays) {
+            if (display.getEndedAt() != null) {
+                throw new IllegalArgumentException("Display is already ended: " + display.getId());
+            }
+            if (!display.getLocationType().equals(locationType) || !display.getMachineId().equals(machineId)) {
+                throw new IllegalArgumentException(
+                        "All displays must belong to the same machine; got " + display.getId() +
+                                " on a different machine than " + first.getId());
+            }
+        }
+
+        // Snapshot active list BEFORE mutation for the notification's before/after.
+        List<MachineDisplay> activeBefore = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(locationType, machineId);
+
+        OffsetDateTime now = OffsetDateTime.now();
+        displays.forEach(display -> display.setEndedAt(now));
+        machineDisplayRepository.saveAll(displays);
+
+        String machineCode = resolveLocationCode(machineId, locationType);
+        List<String> removedNames = displays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        AuditLog auditLog = auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_REMOVED,
+                machineId, machineCode,
+                null, null,
+                removedNames.size(), 0,
+                buildProductSummary(removedNames),
+                null
+        );
+
+        List<StockMovement> movements = displays.stream()
+                .map(display -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(display.getProduct())
+                        .locationType(locationType)
+                        .fromLocationId(machineId)
+                        .toLocationId(null)
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_REMOVED)
+                        .actorId(request.getActorId())
+                        .at(now)
+                        .site(display.getLocation().getStorageLocation().getSite())
+                        .build())
+                .collect(Collectors.toList());
+        inventoryOperations.saveMovements(movements);
+
+        Set<UUID> removedIds = displays.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
+        List<String> previousNames = activeBefore.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        List<String> currentNames = activeBefore.stream()
+                .filter(d -> !removedIds.contains(d.getId()))
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        emitDisplayNotification(
+                NotificationType.DISPLAY_REMOVED,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
+        );
+
+        return getActiveDisplaysForMachine(locationType, machineId);
+    }
+
+    /**
+     * Atomically swap one displayed product for another on the same machine.
+     * Ends the outgoing display record and creates a new one for the incoming product.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> swapDisplay(SwapMachineDisplayRequestDTO request) {
+        MachineDisplay outgoing = machineDisplayRepository.findByIdWithProduct(request.getOutgoingDisplayId())
+                .orElseThrow(() -> new IllegalArgumentException("Display not found: " + request.getOutgoingDisplayId()));
+
+        if (outgoing.getEndedAt() != null) {
+            throw new IllegalArgumentException("Display is already ended");
+        }
+        // Same ownership-mismatch bug class as batchSwapDisplay's T-6c-4 P1 fix: the outgoing
+        // display id is looked up globally, so without this check a request naming
+        // request.getMachineId() could end a display that actually lives on a different machine.
+        if (!Objects.equals(outgoing.getMachineId(), request.getMachineId())
+                || outgoing.getLocationType() != request.getLocationType()) {
+            throw new IllegalArgumentException(
+                    "Display does not belong to machine: " + request.getOutgoingDisplayId());
+        }
+
+        String outgoingProductName = outgoing.getProduct().getName();
+
+        outgoing.setEndedAt(OffsetDateTime.now());
+        machineDisplayRepository.save(outgoing);
+
+        ProductRef incoming = catalogQueries.findById(request.getIncomingProductId())
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + request.getIncomingProductId()));
+
+        List<MachineDisplay> currentDisplays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+
+        boolean alreadyDisplayed = currentDisplays.stream()
+                .anyMatch(d -> d.getProduct().getId().equals(request.getIncomingProductId()));
+
+        if (alreadyDisplayed) {
+            throw new IllegalArgumentException("Product is already displayed on this machine");
+        }
+
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationService.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
+        MachineDisplay newDisplay = MachineDisplay.builder()
+                .location(location)
+                .locationType(request.getLocationType())
+                .machineId(request.getMachineId())
+                .product(catalogEntityAccess.getReference(incoming.id()))
+                .startedAt(OffsetDateTime.now())
+                .actorId(request.getActorId())
+                .site(location.getStorageLocation().getSite())
+                .build();
+        machineDisplayRepository.save(newDisplay);
+
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        String productSummary = outgoingProductName + " → " + incoming.name();
+        auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SWAP,
+                request.getMachineId(), machineCode,
+                request.getMachineId(), machineCode,
+                1, 0,
+                productSummary,
+                null
+        );
+
+        List<String> previousNames = currentDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        // currentDisplays was queried AFTER ending the outgoing display, so it already excludes it.
+        List<String> currentNames = new ArrayList<>(previousNames);
+        currentNames.add(incoming.name());
+        // Reconstruct the true "previously" by adding the outgoing back in.
+        List<String> trulyPrevious = new ArrayList<>(previousNames);
+        trulyPrevious.add(outgoingProductName);
+        emitDisplayNotification(
+                NotificationType.DISPLAY_SWAP,
+                request.getActorId(),
+                OffsetDateTime.now(),
+                List.of(new MachineSnapshot(machineCode, trulyPrevious, currentNames))
+        );
+
+        return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+    }
+
+    /**
+     * Represents a single display change for creating StockMovement entries
+     */
+    private record DisplayChange(
+            Product product,
+            LocationType locationType,
+            UUID fromMachineId,
+            UUID toMachineId
+    ) {}
+
+    /**
+     * Resolve the site for a machine (location) id, for the swap StockMovement's site
+     * (.specs/phase-6-inventory 6b) — destination-first, matching V60's backfill convention.
+     */
+    private com.mirai.inventoryservice.sites.domain.Site resolveMachineSite(UUID machineId) {
+        return locationService.findById(machineId)
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + machineId))
+                .getStorageLocation().getSite();
+    }
+
+    /**
+     * Same-site-only swap precondition (.specs/phase-6-inventory 6c, T-6c-4). Audited
+     * inter-site transfers are Phase 7's; until then a machine-to-machine swap whose two
+     * machines belong to different sites must be rejected explicitly, before any mutation.
+     */
+    private void requireSameSite(UUID sourceMachineId, UUID targetMachineId) {
+        com.mirai.inventoryservice.sites.domain.Site sourceSite = resolveMachineSite(sourceMachineId);
+        com.mirai.inventoryservice.sites.domain.Site targetSite = resolveMachineSite(targetMachineId);
+        if (!Objects.equals(sourceSite.getId(), targetSite.getId())) {
+            throw new com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException(
+                    "Cannot swap displays across sites: source site " + sourceSite.getCode()
+                            + " does not match target site " + targetSite.getCode());
+        }
+    }
+
+    /**
+     * Batch display swap operation that handles both swap modes in a single transaction:
+     * 1. Swap with products - remove displays and add new products
+     * 2. Swap with another machine - trade displays between two machines
+     * Creates a single audit log entry with StockMovement entries for each change.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> batchSwapDisplay(BatchDisplaySwapRequestDTO request) {
+        // Fail fast, before any write: reject a cross-site machine-to-machine swap
+        // (.specs/phase-6-inventory 6c, T-6c-4 -- flagged as advisory debt by 6b's review).
+        // Same-site-only in 6c; audited inter-site transfers are Phase 7's.
+        if (request.getTargetMachineId() != null && request.getTargetLocationType() != null) {
+            requireSameSite(request.getMachineId(), request.getTargetMachineId());
+        }
+
+        OffsetDateTime now = OffsetDateTime.now();
+        List<DisplayChange> displayChanges = new ArrayList<>();
+        List<String> allProductNames = new ArrayList<>();
+        String sourceMachineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        String targetMachineCode = null;
+
+        // Snapshot source machine's active displays BEFORE any mutation. Used to build the
+        // per-machine before/after lists in the Slack notification AND as the source of
+        // existing-product checks for the add / from-target phases below — one query, reused.
+        List<MachineDisplay> sourceActiveDisplays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(request.getLocationType(), request.getMachineId());
+        List<String> sourcePreviousNames = sourceActiveDisplays.stream()
+                .map(d -> d.getProduct().getName())
+                .collect(Collectors.toList());
+        Set<UUID> sourceExistingProductIds = sourceActiveDisplays.stream()
+                .map(d -> d.getProduct().getId())
+                .collect(Collectors.toCollection(HashSet::new));
+        List<String> targetPreviousNames = null;
+
+        // Mode 1: Swap with products (remove displays, add new products)
+        if (request.getDisplayIdsToRemove() != null && !request.getDisplayIdsToRemove().isEmpty()) {
+            List<UUID> removeIds = request.getDisplayIdsToRemove().stream().distinct().collect(Collectors.toList());
+            List<MachineDisplay> toRemove = machineDisplayRepository.findAllByIdInWithProduct(removeIds);
+
+            if (toRemove.size() != removeIds.size()) {
+                Set<UUID> found = toRemove.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
+                UUID missing = removeIds.stream().filter(id -> !found.contains(id)).findFirst().orElse(null);
+                throw new IllegalArgumentException("Display not found: " + missing);
+            }
+            for (MachineDisplay display : toRemove) {
+                if (display.getEndedAt() != null) {
+                    throw new IllegalArgumentException("Display is already ended: " + display.getId());
+                }
+                // T-6c-4 P1 fix (round 2): same ownership-mismatch bug as
+                // displayIdsFromTarget/displayIdsToTarget below -- findAllByIdInWithProduct looks
+                // displays up globally by id, so without this check a request naming machineId
+                // could end and attribute a display that actually lives on a different (e.g.
+                // foreign-site) machine.
+                if (!Objects.equals(display.getMachineId(), request.getMachineId())
+                        || display.getLocationType() != request.getLocationType()) {
+                    throw new IllegalArgumentException(
+                            "Display does not belong to source machine: " + display.getId());
+                }
+                Product product = display.getProduct();
+                displayChanges.add(new DisplayChange(
+                        product,
+                        request.getLocationType(),
+                        request.getMachineId(),
+                        null
+                ));
+                allProductNames.add(product.getName());
+                display.setEndedAt(now);
+            }
+            machineDisplayRepository.saveAll(toRemove);
+        }
+
+        if (request.getProductIdsToAdd() != null && !request.getProductIdsToAdd().isEmpty()) {
+            // Reuse the snapshot taken above instead of re-querying.
+            // Filter out already displayed products
+            List<UUID> newProductIds = request.getProductIdsToAdd().stream()
+                    .distinct()
+                    .filter(id -> !sourceExistingProductIds.contains(id))
+                    .collect(Collectors.toList());
+
+            if (!newProductIds.isEmpty()) {
+                Map<UUID, ProductRef> productsById = catalogQueries.findAllByIds(newProductIds).stream()
+                        .collect(Collectors.toMap(ProductRef::id, p -> p));
+
+                // Look up location by machineId (UUIDs preserved during migration)
+                Location location = locationService.findById(request.getMachineId())
+                        .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
+                List<MachineDisplay> toAdd = new ArrayList<>(newProductIds.size());
+                for (UUID productId : newProductIds) {
+                    ProductRef productRef = productsById.get(productId);
+                    if (productRef == null) {
+                        throw new IllegalArgumentException("Product not found: " + productId);
+                    }
+                    Product product = catalogEntityAccess.getReference(productId);
+
+                    toAdd.add(MachineDisplay.builder()
+                            .location(location)
+                            .locationType(request.getLocationType())
+                            .machineId(request.getMachineId())
+                            .product(product)
+                            .startedAt(now)
+                            .actorId(request.getActorId())
+                            .site(location.getStorageLocation().getSite())
+                            .build());
+                    displayChanges.add(new DisplayChange(
+                            product,
+                            request.getLocationType(),
+                            null,
+                            request.getMachineId()
+                    ));
+                    allProductNames.add(productRef.name());
+                }
+                machineDisplayRepository.saveAll(toAdd);
+            }
+        }
+
+        // Mode 2: Machine-to-machine swap
+        if (request.getTargetMachineId() != null && request.getTargetLocationType() != null) {
+            targetMachineCode = resolveLocationCode(request.getTargetMachineId(), request.getTargetLocationType());
+            // Single query for target snapshot, reused by both from-target and to-target phases below.
+            List<MachineDisplay> targetActiveDisplays = machineDisplayRepository
+                    .findActiveByLocationTypeAndMachineId(request.getTargetLocationType(), request.getTargetMachineId());
+            targetPreviousNames = targetActiveDisplays.stream()
+                    .map(d -> d.getProduct().getName())
+                    .collect(Collectors.toList());
+            Set<UUID> targetExistingProductIds = targetActiveDisplays.stream()
+                    .map(d -> d.getProduct().getId())
+                    .collect(Collectors.toCollection(HashSet::new));
+
+            // Move displays FROM target machine TO current machine
+            if (request.getDisplayIdsFromTarget() != null && !request.getDisplayIdsFromTarget().isEmpty()) {
+                // Look up location by machineId (UUIDs preserved during migration)
+                Location currentLocation = locationService.findById(request.getMachineId())
+                        .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
+                List<UUID> fromIds = request.getDisplayIdsFromTarget().stream().distinct().collect(Collectors.toList());
+                List<MachineDisplay> fromDisplays = machineDisplayRepository.findAllByIdInWithProduct(fromIds);
+                if (fromDisplays.size() != fromIds.size()) {
+                    Set<UUID> found = fromDisplays.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
+                    UUID missing = fromIds.stream().filter(id -> !found.contains(id)).findFirst().orElse(null);
+                    throw new IllegalArgumentException("Display not found: " + missing);
+                }
+                for (MachineDisplay d : fromDisplays) {
+                    if (d.getEndedAt() != null) {
+                        throw new IllegalArgumentException("Display is already ended: " + d.getId());
+                    }
+                    // T-6c-4 P1 fix: the machine/site guard above only checks the requested
+                    // machine ids -- it says nothing about which machine a *display id* actually
+                    // belongs to. Without this check, naming two same-site machines while
+                    // supplying a foreign (e.g. cross-site) display id in displayIdsFromTarget
+                    // would pass the site guard and then end/recreate that foreign display here.
+                    if (!Objects.equals(d.getMachineId(), request.getTargetMachineId())
+                            || d.getLocationType() != request.getTargetLocationType()) {
+                        throw new IllegalArgumentException(
+                                "Display does not belong to target machine: " + d.getId());
+                    }
+                }
+
+                List<MachineDisplay> endedOnTarget = new ArrayList<>(fromDisplays.size());
+                List<MachineDisplay> createdOnSource = new ArrayList<>(fromDisplays.size());
+                for (MachineDisplay display : fromDisplays) {
+                    // Skip if product is already displayed on current machine
+                    if (sourceExistingProductIds.contains(display.getProduct().getId())) {
+                        continue;
+                    }
+
+                    Product product = display.getProduct();
+
+                    display.setEndedAt(now);
+                    endedOnTarget.add(display);
+
+                    createdOnSource.add(MachineDisplay.builder()
+                            .location(currentLocation)
+                            .locationType(request.getLocationType())
+                            .machineId(request.getMachineId())
+                            .product(product)
+                            .startedAt(now)
+                            .actorId(request.getActorId())
+                            .site(currentLocation.getStorageLocation().getSite())
+                            .build());
+
+                    displayChanges.add(new DisplayChange(
+                            product,
+                            request.getLocationType(),
+                            request.getTargetMachineId(),
+                            request.getMachineId()
+                    ));
+                    allProductNames.add(product.getName());
+                    sourceExistingProductIds.add(product.getId());
+                }
+                if (!endedOnTarget.isEmpty()) {
+                    machineDisplayRepository.saveAll(endedOnTarget);
+                    machineDisplayRepository.saveAll(createdOnSource);
+                }
+            }
+
+            // Move displays FROM current machine TO target machine
+            if (request.getDisplayIdsToTarget() != null && !request.getDisplayIdsToTarget().isEmpty()) {
+                // Look up target location by machineId (UUIDs preserved during migration)
+                Location targetLocation = locationService.findById(request.getTargetMachineId())
+                        .orElseThrow(() -> new LocationNotFoundException("Target location not found: " + request.getTargetMachineId()));
+
+                List<UUID> toIds = request.getDisplayIdsToTarget().stream().distinct().collect(Collectors.toList());
+                List<MachineDisplay> toDisplays = machineDisplayRepository.findAllByIdInWithProduct(toIds);
+                if (toDisplays.size() != toIds.size()) {
+                    Set<UUID> found = toDisplays.stream().map(MachineDisplay::getId).collect(Collectors.toSet());
+                    UUID missing = toIds.stream().filter(id -> !found.contains(id)).findFirst().orElse(null);
+                    throw new IllegalArgumentException("Display not found: " + missing);
+                }
+                for (MachineDisplay d : toDisplays) {
+                    if (d.getEndedAt() != null) {
+                        throw new IllegalArgumentException("Display is already ended: " + d.getId());
+                    }
+                    // T-6c-4 P1 fix: same reasoning as displayIdsFromTarget above, mirrored for
+                    // the opposite direction -- a display id here must actually belong to the
+                    // requested source machine, not just any machine the caller can reach by id.
+                    if (!Objects.equals(d.getMachineId(), request.getMachineId())
+                            || d.getLocationType() != request.getLocationType()) {
+                        throw new IllegalArgumentException(
+                                "Display does not belong to source machine: " + d.getId());
+                    }
+                }
+
+                List<MachineDisplay> endedOnSource = new ArrayList<>(toDisplays.size());
+                List<MachineDisplay> createdOnTarget = new ArrayList<>(toDisplays.size());
+                for (MachineDisplay display : toDisplays) {
+                    // Skip if product is already displayed on target machine
+                    if (targetExistingProductIds.contains(display.getProduct().getId())) {
+                        continue;
+                    }
+
+                    Product product = display.getProduct();
+
+                    display.setEndedAt(now);
+                    endedOnSource.add(display);
+
+                    createdOnTarget.add(MachineDisplay.builder()
+                            .location(targetLocation)
+                            .locationType(request.getTargetLocationType())
+                            .machineId(request.getTargetMachineId())
+                            .product(product)
+                            .startedAt(now)
+                            .actorId(request.getActorId())
+                            .site(targetLocation.getStorageLocation().getSite())
+                            .build());
+
+                    displayChanges.add(new DisplayChange(
+                            product,
+                            request.getLocationType(),
+                            request.getMachineId(),
+                            request.getTargetMachineId()
+                    ));
+                    allProductNames.add(product.getName());
+                    targetExistingProductIds.add(product.getId());
+                }
+                if (!endedOnSource.isEmpty()) {
+                    machineDisplayRepository.saveAll(endedOnSource);
+                    machineDisplayRepository.saveAll(createdOnTarget);
+                }
+            }
+        }
+
+        // Create audit log and stock movements for the swap operation
+        if (!displayChanges.isEmpty()) {
+            String productSummary = buildProductSummary(allProductNames.stream().distinct().collect(Collectors.toList()));
+
+            // Create the audit log entry
+            AuditLog auditLog = auditLogService.createAuditLog(
+                    request.getActorId(),
+                    StockMovementReason.DISPLAY_SWAP,
+                    request.getMachineId(), sourceMachineCode,
+                    request.getTargetMachineId() != null ? request.getTargetMachineId() : request.getMachineId(),
+                    request.getTargetMachineId() != null ? targetMachineCode : sourceMachineCode,
+                    displayChanges.size(), 0,
+                    productSummary,
+                    null
+            );
+
+            // Create StockMovement entries for each display change (batch insert)
+            List<StockMovement> movements = displayChanges.stream()
+                    .map(change -> StockMovement.builder()
+                            .auditLog(auditLog)
+                            .item(change.product())
+                            .locationType(change.locationType())
+                            .fromLocationId(change.fromMachineId())
+                            .toLocationId(change.toMachineId())
+                            .previousQuantity(0)
+                            .currentQuantity(0)
+                            .quantityChange(0)  // Display changes don't affect quantity
+                            .reason(StockMovementReason.DISPLAY_SWAP)
+                            .actorId(request.getActorId())
+                            .at(now)
+                            .site(resolveMachineSite(
+                                    change.toMachineId() != null ? change.toMachineId() : change.fromMachineId()))
+                            .build())
+                    .collect(Collectors.toList());
+            inventoryOperations.saveMovements(movements);
+
+            List<MachineSnapshot> snapshots = new ArrayList<>();
+            snapshots.add(new MachineSnapshot(
+                    sourceMachineCode,
+                    sourcePreviousNames,
+                    applyChanges(sourcePreviousNames, displayChanges, request.getMachineId())
+            ));
+            if (request.getTargetMachineId() != null && targetPreviousNames != null) {
+                snapshots.add(new MachineSnapshot(
+                        targetMachineCode,
+                        targetPreviousNames,
+                        applyChanges(targetPreviousNames, displayChanges, request.getTargetMachineId())
+                ));
+            }
+            emitDisplayNotification(
+                    NotificationType.DISPLAY_SWAP,
+                    request.getActorId(),
+                    now,
+                    snapshots
+            );
+        }
+
+        return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+    }
+
+    /**
+     * Renew display records - ends current displays and creates new ones with fresh startedAt.
+     * Used when restocking the same product to reset tracking.
+     */
+    @Transactional
+    public List<MachineDisplayDTO> renewDisplays(RenewDisplayRequestDTO request) {
+        if (request.getDisplayIds() == null || request.getDisplayIds().isEmpty()) {
+            return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+        }
+
+        // Look up location by machineId (UUIDs preserved during migration)
+        Location location = locationService.findById(request.getMachineId())
+                .orElseThrow(() -> new LocationNotFoundException("Location not found: " + request.getMachineId()));
+
+        OffsetDateTime now = OffsetDateTime.now();
+        List<MachineDisplay> renewedDisplays = new ArrayList<>();
+        List<String> productNames = new ArrayList<>();
+
+        for (UUID displayId : request.getDisplayIds()) {
+            MachineDisplay existing = machineDisplayRepository.findByIdWithProduct(displayId)
+                    .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+
+            if (existing.getEndedAt() != null) {
+                throw new IllegalArgumentException("Display is already ended: " + displayId);
+            }
+            // Same ownership-mismatch bug class as batchSwapDisplay's T-6c-4 P1 fix: a display id
+            // is looked up globally, so without this check a request naming request.getMachineId()
+            // could end and recreate (at that machine) a display that actually lives elsewhere.
+            if (!Objects.equals(existing.getMachineId(), request.getMachineId())
+                    || existing.getLocationType() != request.getLocationType()) {
+                throw new IllegalArgumentException(
+                        "Display does not belong to machine: " + displayId);
+            }
+
+            Product product = existing.getProduct();
+            productNames.add(product.getName());
+
+            // End the existing display
+            existing.setEndedAt(now);
+            machineDisplayRepository.save(existing);
+
+            // Create a new display with fresh startedAt
+            MachineDisplay newDisplay = MachineDisplay.builder()
+                    .location(location)
+                    .locationType(request.getLocationType())
+                    .machineId(request.getMachineId())
+                    .product(product)
+                    .startedAt(now)
+                    .actorId(request.getActorId())
+                    .site(location.getStorageLocation().getSite())
+                    .build();
+            renewedDisplays.add(machineDisplayRepository.save(newDisplay));
+        }
+
+        // Create audit log
+        String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
+        AuditLog auditLog = auditLogService.createAuditLog(
+                request.getActorId(),
+                StockMovementReason.DISPLAY_SWAP, // Reuse DISPLAY_SWAP for renewal
+                request.getMachineId(), machineCode,
+                request.getMachineId(), machineCode,
+                productNames.size(), 0,
+                "Renewed: " + buildProductSummary(productNames),
+                null
+        );
+
+        // Create StockMovement entries for each renewed display
+        List<StockMovement> movements = renewedDisplays.stream()
+                .map(display -> StockMovement.builder()
+                        .auditLog(auditLog)
+                        .item(display.getProduct())
+                        .locationType(request.getLocationType())
+                        .fromLocationId(request.getMachineId())
+                        .toLocationId(request.getMachineId())
+                        .previousQuantity(0)
+                        .currentQuantity(0)
+                        .quantityChange(0)
+                        .reason(StockMovementReason.DISPLAY_SWAP)
+                        .actorId(request.getActorId())
+                        .at(now)
+                        .site(location.getStorageLocation().getSite())
+                        .build())
+                .collect(Collectors.toList());
+        inventoryOperations.saveMovements(movements);
+
+        emitDisplayNotification(
+                NotificationType.DISPLAY_RENEWED,
+                request.getActorId(),
+                now,
+                List.of(new MachineSnapshot(machineCode, productNames, productNames))
+        );
+
+        return getActiveDisplaysForMachine(request.getLocationType(), request.getMachineId());
+    }
+
+    /**
+     * Get all active displays for a specific machine
+     */
+    public List<MachineDisplayDTO> getActiveDisplaysForMachine(LocationType locationType, UUID machineId) {
+        List<MachineDisplay> displays = machineDisplayRepository
+                .findActiveByLocationTypeAndMachineId(locationType, machineId);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get current display for a specific machine
+     */
+    public Optional<MachineDisplayDTO> getCurrentDisplay(LocationType locationType, UUID machineId) {
+        return machineDisplayRepository
+                .findByLocationTypeAndMachineIdAndEndedAtIsNull(locationType, machineId)
+                .map(display -> toDTO(display));
+    }
+
+    /**
+     * Get all current active displays
+     */
+    public List<MachineDisplayDTO> getAllActiveDisplays() {
+        List<MachineDisplay> displays = machineDisplayRepository.findByEndedAtIsNullOrderByStartedAtAsc();
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get all current active displays with pagination
+     */
+    public Page<MachineDisplayDTO> getAllActiveDisplays(Pageable pageable) {
+        Page<MachineDisplay> displays = machineDisplayRepository.findByEndedAtIsNull(pageable);
+        return toDTOPage(displays);
+    }
+
+    /**
+     * Get active displays for a specific location type
+     */
+    public List<MachineDisplayDTO> getActiveDisplaysByLocationType(LocationType locationType) {
+        List<MachineDisplay> displays = machineDisplayRepository
+                .findByLocationTypeAndEndedAtIsNullOrderByStartedAtAsc(locationType);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get display history for a specific machine
+     */
+    public List<MachineDisplayDTO> getMachineHistory(LocationType locationType, UUID machineId) {
+        List<MachineDisplay> displays = machineDisplayRepository
+                .findByLocationTypeAndMachineIdOrderByStartedAtDesc(locationType, machineId);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get display history for a specific machine with pagination
+     */
+    public Page<MachineDisplayDTO> getMachineHistory(LocationType locationType, UUID machineId, Pageable pageable) {
+        Page<MachineDisplay> displays = machineDisplayRepository
+                .findByLocationTypeAndMachineIdOrderByStartedAtDesc(locationType, machineId, pageable);
+        return toDTOPage(displays);
+    }
+
+    /**
+     * Get all stale displays (active longer than threshold)
+     */
+    public List<MachineDisplayDTO> getStaleDisplays() {
+        OffsetDateTime threshold = OffsetDateTime.now().minusDays(staleThresholdDays);
+        List<MachineDisplay> displays = machineDisplayRepository.findStaleDisplays(threshold);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get stale displays for a specific location type
+     */
+    public List<MachineDisplayDTO> getStaleDisplaysByLocationType(LocationType locationType) {
+        OffsetDateTime threshold = OffsetDateTime.now().minusDays(staleThresholdDays);
+        List<MachineDisplay> displays = machineDisplayRepository
+                .findStaleDisplaysByLocationType(locationType, threshold);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get stale displays with custom threshold
+     */
+    public List<MachineDisplayDTO> getStaleDisplays(int thresholdDays) {
+        OffsetDateTime threshold = OffsetDateTime.now().minusDays(thresholdDays);
+        List<MachineDisplay> displays = machineDisplayRepository.findStaleDisplays(threshold);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Get display history for a product
+     */
+    public List<MachineDisplayDTO> getProductHistory(UUID productId) {
+        List<MachineDisplay> displays = machineDisplayRepository.findByProduct_IdOrderByStartedAtDesc(productId);
+        return toDTOList(displays);
+    }
+
+    /**
+     * Delete a display history record (permanently removes from database)
+     */
+    @Transactional
+    public void deleteDisplayHistory(UUID displayId) {
+        MachineDisplay display = machineDisplayRepository.findById(displayId)
+                .orElseThrow(() -> new IllegalArgumentException("Display history not found: " + displayId));
+
+        machineDisplayRepository.delete(display);
+    }
+
+    // ========= Site-scoped reads (.specs/phase-7-displays T-4, AC-3) =========
+    // A display/machine belonging to a different site is indistinguishable from a nonexistent
+    // one, matching shipments' ShipmentService site-scoped method precedent. These do not
+    // replace the legacy (unscoped) methods above -- SiteMachineDisplayController is their only
+    // caller, MachineDisplayController keeps calling the legacy overloads unchanged.
+
+    public List<MachineDisplayDTO> getActiveDisplaysForMachine(UUID siteId, LocationType locationType, UUID machineId) {
+        return toDTOList(machineDisplayRepository
+                .findActiveByLocationTypeAndMachineIdAndSite_Id(locationType, machineId, siteId));
+    }
+
+    /**
+     * Unlike the legacy single-result finder this deliberately avoids
+     * ({@code findByLocationTypeAndMachineIdAndSite_IdAndEndedAtIsNull} throws when a machine
+     * already shows more than one product), this returns the first of possibly several active
+     * displays -- a machine legitimately holds multiple products at once.
+     */
+    public Optional<MachineDisplayDTO> getCurrentDisplay(UUID siteId, LocationType locationType, UUID machineId) {
+        return machineDisplayRepository
+                .findActiveByLocationTypeAndMachineIdAndSite_Id(locationType, machineId, siteId)
+                .stream()
+                .findFirst()
+                .map(this::toDTO);
+    }
+
+    public List<MachineDisplayDTO> getAllActiveDisplays(UUID siteId) {
+        return toDTOList(machineDisplayRepository.findByEndedAtIsNullAndSite_IdOrderByStartedAtAsc(siteId));
+    }
+
+    public Page<MachineDisplayDTO> getAllActiveDisplays(UUID siteId, Pageable pageable) {
+        return toDTOPage(machineDisplayRepository.findByEndedAtIsNullAndSite_Id(siteId, pageable));
+    }
+
+    public List<MachineDisplayDTO> getActiveDisplaysByLocationType(UUID siteId, LocationType locationType) {
+        return toDTOList(machineDisplayRepository
+                .findByLocationTypeAndEndedAtIsNullAndSite_IdOrderByStartedAtAsc(locationType, siteId));
+    }
+
+    public List<MachineDisplayDTO> getMachineHistory(UUID siteId, LocationType locationType, UUID machineId) {
+        return toDTOList(machineDisplayRepository
+                .findByLocationTypeAndMachineIdAndSite_IdOrderByStartedAtDesc(locationType, machineId, siteId));
+    }
+
+    public Page<MachineDisplayDTO> getMachineHistory(UUID siteId, LocationType locationType, UUID machineId, Pageable pageable) {
+        return toDTOPage(machineDisplayRepository
+                .findByLocationTypeAndMachineIdAndSite_IdOrderByStartedAtDesc(locationType, machineId, siteId, pageable));
+    }
+
+    public List<MachineDisplayDTO> getStaleDisplays(UUID siteId) {
+        OffsetDateTime threshold = OffsetDateTime.now().minusDays(staleThresholdDays);
+        return toDTOList(machineDisplayRepository.findStaleDisplaysBySite_Id(threshold, siteId));
+    }
+
+    public List<MachineDisplayDTO> getStaleDisplaysByLocationType(UUID siteId, LocationType locationType) {
+        OffsetDateTime threshold = OffsetDateTime.now().minusDays(staleThresholdDays);
+        return toDTOList(machineDisplayRepository.findStaleDisplaysByLocationTypeAndSite_Id(locationType, threshold, siteId));
+    }
+
+    public List<MachineDisplayDTO> getStaleDisplays(UUID siteId, int thresholdDays) {
+        OffsetDateTime threshold = OffsetDateTime.now().minusDays(thresholdDays);
+        return toDTOList(machineDisplayRepository.findStaleDisplaysBySite_Id(threshold, siteId));
+    }
+
+    public List<MachineDisplayDTO> getProductHistory(UUID siteId, UUID productId) {
+        return toDTOList(machineDisplayRepository.findByProduct_IdAndSite_IdOrderByStartedAtDesc(productId, siteId));
+    }
+
+    @Transactional
+    public void deleteDisplayHistory(UUID siteId, UUID displayId) {
+        MachineDisplay display = machineDisplayRepository.findByIdAndSite_Id(displayId, siteId)
+                .orElseThrow(() -> new IllegalArgumentException("Display history not found: " + displayId));
+        machineDisplayRepository.delete(display);
+    }
+
+    @Transactional
+    public void clearDisplay(UUID siteId, LocationType locationType, UUID machineId, UUID actorId) {
+        locationService.getLocationById(siteId, machineId);
+        clearDisplay(locationType, machineId, actorId);
+    }
+
+    @Transactional
+    public void clearDisplayById(UUID siteId, UUID displayId, UUID actorId) {
+        MachineDisplay display = machineDisplayRepository.findByIdAndSite_Id(displayId, siteId)
+                .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+        clearDisplayById(display.getId(), actorId);
+    }
+
+    @Transactional
+    public List<MachineDisplayDTO> batchClearDisplays(UUID siteId, BatchClearDisplaysRequestDTO request) {
+        for (UUID displayId : request.getDisplayIds()) {
+            machineDisplayRepository.findByIdAndSite_Id(displayId, siteId)
+                    .orElseThrow(() -> new IllegalArgumentException("Display not found: " + displayId));
+        }
+        return batchClearDisplays(request);
+    }
+
+    @Transactional
+    public MachineDisplay setDisplay(UUID siteId, SetMachineDisplayRequestDTO request) {
+        locationService.getLocationById(siteId, request.getMachineId());
+        return setDisplay(request);
+    }
+
+    @Transactional
+    public List<MachineDisplay> setDisplayBatch(UUID siteId, SetMachineDisplayBatchRequestDTO request) {
+        locationService.getLocationById(siteId, request.getMachineId());
+        return setDisplayBatch(request);
+    }
+
+    @Transactional
+    public List<MachineDisplayDTO> swapDisplay(UUID siteId, SwapMachineDisplayRequestDTO request) {
+        locationService.getLocationById(siteId, request.getMachineId());
+        return swapDisplay(request);
+    }
+
+    @Transactional
+    public List<MachineDisplayDTO> batchSwapDisplay(UUID siteId, BatchDisplaySwapRequestDTO request) {
+        locationService.getLocationById(siteId, request.getMachineId());
+        if (request.getTargetMachineId() != null) {
+            locationService.getLocationById(siteId, request.getTargetMachineId());
+        }
+        return batchSwapDisplay(request);
+    }
+
+    @Transactional
+    public List<MachineDisplayDTO> renewDisplays(UUID siteId, RenewDisplayRequestDTO request) {
+        locationService.getLocationById(siteId, request.getMachineId());
+        return renewDisplays(request);
+    }
+
+    // ========= Helper Methods =========
+
+    /**
+     * Maps an already-loaded display directly, without re-querying for "the" active display on
+     * its machine -- a machine can show several products at once, so a query-based re-lookup
+     * (e.g. by machine id) can return a different display than the one just created or mutated.
+     */
+    public MachineDisplayDTO toResponseDTO(MachineDisplay display) {
+        return toDTO(display);
+    }
+
+    private MachineDisplayDTO toDTO(MachineDisplay display) {
+        String machineCode = resolveLocationCode(display.getMachineId(), display.getLocationType());
+        String actorName = resolveActorName(display.getActorId());
+
+        return MachineDisplayDTO.fromEntity(display, machineCode, actorName, staleThresholdDays);
+    }
+
+    private List<MachineDisplayDTO> toDTOList(List<MachineDisplay> displays) {
+        if (displays.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Batch fetch actor names to avoid N+1
+        Set<UUID> actorIds = displays.stream()
+                .map(MachineDisplay::getActorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, String> actorNames = batchResolveActorNames(actorIds);
+
+        // Batch fetch machine codes
+        Map<String, String> machineCodes = batchResolveMachineCodes(displays);
+
+        return displays.stream()
+                .map(display -> {
+                    String key = display.getLocationType() + ":" + display.getMachineId();
+                    String machineCode = machineCodes.get(key);
+                    String actorName = display.getActorId() != null ? actorNames.get(display.getActorId()) : null;
+
+                    return MachineDisplayDTO.fromEntity(display, machineCode, actorName, staleThresholdDays);
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Page<MachineDisplayDTO> toDTOPage(Page<MachineDisplay> displays) {
+        if (displays.isEmpty()) {
+            return displays.map(d -> null); // Returns empty page with same metadata
+        }
+
+        List<MachineDisplay> content = displays.getContent();
+
+        // Batch fetch actor names to avoid N+1
+        Set<UUID> actorIds = content.stream()
+                .map(MachineDisplay::getActorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<UUID, String> actorNames = batchResolveActorNames(actorIds);
+
+        // Batch fetch machine codes
+        Map<String, String> machineCodes = batchResolveMachineCodes(content);
+
+        // Map content with pre-fetched data
+        List<MachineDisplayDTO> dtoContent = content.stream()
+                .map(display -> {
+                    String key = display.getLocationType() + ":" + display.getMachineId();
+                    String machineCode = machineCodes.get(key);
+                    String actorName = display.getActorId() != null ? actorNames.get(display.getActorId()) : null;
+
+                    return MachineDisplayDTO.fromEntity(display, machineCode, actorName, staleThresholdDays);
+                })
+                .collect(Collectors.toList());
+
+        return new org.springframework.data.domain.PageImpl<>(
+                dtoContent,
+                displays.getPageable(),
+                displays.getTotalElements()
+        );
+    }
+
+    private String resolveLocationCode(UUID locationId, LocationType locationType) {
+        if (locationId == null) return null;
+
+        // Handle NOT_ASSIGNED specially - it has no physical location
+        if (locationType == LocationType.NOT_ASSIGNED) {
+            return "NA";
+        }
+
+        return locationService.findById(locationId)
+                .map(Location::getLocationCode)
+                .orElse(null);
+    }
+
+    private String resolveActorName(UUID actorId) {
+        if (actorId == null) return null;
+
+        return userService.findById(actorId)
+                .map(user -> user.getFullName())
+                .orElse(null);
+    }
+
+    private Map<UUID, String> batchResolveActorNames(Set<UUID> actorIds) {
+        if (actorIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        return userService.findAllByIds(actorIds).stream()
+                .collect(Collectors.toMap(
+                        user -> user.getId(),
+                        user -> user.getFullName()
+                ));
+    }
+
+    private Map<String, String> batchResolveMachineCodes(List<MachineDisplay> displays) {
+        Map<String, String> result = new HashMap<>();
+
+        // Collect all machine IDs (which are location IDs in the unified schema)
+        Set<UUID> allMachineIds = displays.stream()
+                .map(MachineDisplay::getMachineId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        if (allMachineIds.isEmpty()) {
+            return result;
+        }
+
+        // Batch fetch all locations in a single query
+        Map<UUID, String> locationCodeMap = locationService.findCodesByIds(allMachineIds);
+
+        // Build the result map with locationType:machineId keys
+        for (MachineDisplay display : displays) {
+            LocationType locationType = display.getLocationType();
+            UUID machineId = display.getMachineId();
+
+            if (machineId == null || locationType == LocationType.NOT_ASSIGNED) {
+                result.put(locationType + ":" + machineId, "NA");
+                continue;
+            }
+
+            String code = locationCodeMap.get(machineId);
+            result.put(locationType + ":" + machineId, code != null ? code : "NA");
+        }
+
+        return result;
+    }
+
+    private String buildProductSummary(List<String> productNames) {
+        if (productNames.isEmpty()) return null;
+        if (productNames.size() == 1) return productNames.get(0);
+        if (productNames.size() == 2) return productNames.get(0) + " + " + productNames.get(1);
+        return productNames.get(0) + " + " + (productNames.size() - 1) + " more";
+    }
+
+    // ========= Display notification helpers =========
+
+    /**
+     * Per-machine snapshot for the Slack notification metadata.
+     * Carries the machine code plus the product display names before and after the change.
+     */
+    private record MachineSnapshot(
+            String code,
+            List<String> previously,
+            List<String> currently
+    ) {
+        Map<String, Object> toMap() {
+            Map<String, Object> map = new HashMap<>();
+            map.put("code", code);
+            map.put("previously", previously);
+            map.put("currently", currently);
+            return map;
+        }
+    }
+
+    /**
+     * Replays the recorded display changes against a starting product-name list to compute
+     * the post-mutation list for a given machine. Names without ID context can collide on
+     * duplicates, but a machine cannot host two displays of the same product simultaneously
+     * (enforced by the existing "already displayed" guards), so a name list is sufficient.
+     */
+    private List<String> applyChanges(List<String> previousNames, List<DisplayChange> changes, UUID machineId) {
+        List<String> result = new ArrayList<>(previousNames);
+        for (DisplayChange change : changes) {
+            String name = change.product().getName();
+            if (machineId.equals(change.fromMachineId())) {
+                result.remove(name);
+            }
+            if (machineId.equals(change.toMachineId())) {
+                if (!result.contains(name)) {
+                    result.add(name);
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Enqueue a Slack notification describing a display change. Failures here MUST NOT
+     * roll back the surrounding display mutation — wrapped in a try/catch that swallows
+     * any exception so the caller's @Transactional commits.
+     */
+    private void emitDisplayNotification(
+            NotificationType type,
+            UUID actorId,
+            OffsetDateTime occurredAt,
+            List<MachineSnapshot> machines
+    ) {
+        try {
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("occurred_at", occurredAt.toString());
+            metadata.put("actor_name", resolveActorName(actorId));
+            metadata.put("machines", machines.stream().map(MachineSnapshot::toMap).collect(Collectors.toList()));
+
+            String separator = machines.size() > 1 ? " ↔ " : "";
+            String summary = machines.stream()
+                    .map(MachineSnapshot::code)
+                    .collect(Collectors.joining(separator));
+
+            Notification notif = Notification.builder()
+                    .type(type)
+                    .severity(NotificationSeverity.INFO)
+                    .message("Display " + actionLabel(type) + " on " + (summary.isEmpty() ? "—" : summary))
+                    .metadata(metadata)
+                    .via(List.of("slack"))
+                    .build();
+            notificationService.createNotification(notif);
+        } catch (Exception e) {
+            log.warn("Failed to enqueue display notification (type={}): {}", type, e.getMessage());
+        }
+    }
+
+    private String actionLabel(NotificationType type) {
+        return switch (type) {
+            case DISPLAY_SET -> "added";
+            case DISPLAY_REMOVED -> "removed";
+            case DISPLAY_SWAP -> "swapped";
+            case DISPLAY_RENEWED -> "renewed";
+            default -> "updated";
+        };
+    }
+
+}

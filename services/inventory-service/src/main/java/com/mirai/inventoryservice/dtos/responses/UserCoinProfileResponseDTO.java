@@ -1,5 +1,7 @@
 package com.mirai.inventoryservice.dtos.responses;
 
+import com.mirai.inventoryservice.lootbox.api.LootboxBalanceResponseDTO;
+import com.mirai.inventoryservice.lootbox.api.LootboxPlayResponseDTO;
 import lombok.Builder;
 
 import java.util.List;

@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -51,6 +52,23 @@ public class UserService {
     public User getUserById(UUID id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
+    }
+
+    /**
+     * Tolerant variant of {@link #getUserById(UUID)} for callers that treat a missing/invalid id
+     * as "no actor", not an error (e.g. an optional {@code receivedBy}/{@code createdBy} on a
+     * write request, or resolving a JWT principal's display name for a response).
+     */
+    public Optional<User> findById(UUID id) {
+        return userRepository.findById(id);
+    }
+
+    /**
+     * Batch variant of {@link #findById(UUID)} for callers that need several actors' names at
+     * once (e.g. a response mapper enriching a page of records).
+     */
+    public List<User> findAllByIds(Collection<UUID> ids) {
+        return userRepository.findAllById(ids);
     }
 
     public User getUserByEmail(String email) {

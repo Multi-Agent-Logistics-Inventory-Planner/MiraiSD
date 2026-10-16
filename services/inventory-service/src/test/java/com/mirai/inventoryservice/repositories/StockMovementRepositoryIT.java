@@ -11,8 +11,10 @@ import com.mirai.inventoryservice.inventory.infrastructure.StockMovementReposito
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.models.kuji.KujiBox;
-import com.mirai.inventoryservice.models.kuji.KujiBoxTier;
+import com.mirai.inventoryservice.kuji.domain.KujiBox;
+import com.mirai.inventoryservice.kuji.domain.KujiBoxTier;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxRepository;
+import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxTierRepository;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
@@ -133,12 +135,14 @@ class StockMovementRepositoryIT extends BaseKafkaIntegrationTest {
         KujiBox box = kujiBoxRepository.save(KujiBox.builder()
                 .product(parent)
                 .location(location)
+                .siteId(site.getId())
                 .status(KujiBoxStatus.OPEN)
                 .openedAt(OffsetDateTime.now().minusDays(1))
                 .build());
 
         KujiBoxTier tier = kujiBoxTierRepository.save(KujiBoxTier.builder()
                 .box(box)
+                .siteId(site.getId())
                 .label("Tier A")
                 .activeCount(10)
                 .inactiveCount(0)

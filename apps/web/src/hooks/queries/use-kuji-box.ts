@@ -1,68 +1,118 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, skipToken } from "@tanstack/react-query";
 import {
-  getActiveKujiBox,
-  getKujiAllocationsByLocation,
-  getKujiAllocationsByProduct,
-  getKujiBox,
-  getKujiBoxHistory,
-  getLastClosedKujiTiers,
-} from "@/lib/api/kuji-boxes";
+  getSiteActiveKujiBox,
+  getSiteKujiAllocationsByLocation,
+  getSiteKujiAllocationsByProduct,
+  getSiteKujiBox,
+  getSiteKujiBoxHistory,
+  getSiteLastClosedKujiTiers,
+} from "@/lib/api/site-kuji-boxes";
 import { ApiClientError } from "@/lib/api/client";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+
+// Query keys are site-qualified (siteId is always the second element) so cache entries never
+// leak across sites; every queryFn stays disabled (skipToken) until siteId resolves, matching
+// useSiteProductInventoryEntries' pattern (.specs/phase-7-kuji-lootbox T-4).
 
 export function useActiveKujiBox(productId: string | null | undefined) {
-  return useQuery({
-    queryKey: ["kuji-box", "active", productId],
-    queryFn: () => getActiveKujiBox(productId!),
-    enabled: !!productId,
-    retry: (_, error) =>
-      !(error instanceof ApiClientError && error.status === 404),
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["kuji-box", "active", siteId, productId],
+    queryFn:
+      siteId && productId ? () => getSiteActiveKujiBox(siteId, productId) : skipToken,
+    retry: (_, error) => !(error instanceof ApiClientError && error.status === 404),
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(productId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 export function useKujiBoxHistory(productId: string | null | undefined) {
-  return useQuery({
-    queryKey: ["kuji-box", "history", productId],
-    queryFn: () => getKujiBoxHistory(productId!),
-    enabled: !!productId,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["kuji-box", "history", siteId, productId],
+    queryFn:
+      siteId && productId ? () => getSiteKujiBoxHistory(siteId, productId) : skipToken,
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(productId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 export function useLastClosedKujiTiers(productId: string | null | undefined) {
-  return useQuery({
-    queryKey: ["kuji-box", "last-tiers", productId],
-    queryFn: () => getLastClosedKujiTiers(productId!),
-    enabled: !!productId,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["kuji-box", "last-tiers", siteId, productId],
+    queryFn:
+      siteId && productId ? () => getSiteLastClosedKujiTiers(siteId, productId) : skipToken,
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(productId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 export function useKujiBox(boxId: string | null | undefined) {
-  return useQuery({
-    queryKey: ["kuji-box", "detail", boxId],
-    queryFn: () => getKujiBox(boxId!),
-    enabled: !!boxId,
-    retry: (_, error) =>
-      !(error instanceof ApiClientError && error.status === 404),
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["kuji-box", "detail", siteId, boxId],
+    queryFn: siteId && boxId ? () => getSiteKujiBox(siteId, boxId) : skipToken,
+    retry: (_, error) => !(error instanceof ApiClientError && error.status === 404),
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(boxId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
-export function useKujiAllocationsByLocation(
-  locationId: string | null | undefined
-) {
-  return useQuery({
-    queryKey: ["kuji-box", "allocations", "by-location", locationId],
-    queryFn: () => getKujiAllocationsByLocation(locationId!),
-    enabled: !!locationId,
+export function useKujiAllocationsByLocation(locationId: string | null | undefined) {
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["kuji-box", "allocations", "by-location", siteId, locationId],
+    queryFn:
+      siteId && locationId
+        ? () => getSiteKujiAllocationsByLocation(siteId, locationId)
+        : skipToken,
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(locationId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
-export function useKujiAllocationsByProduct(
-  productId: string | null | undefined
-) {
-  return useQuery({
-    queryKey: ["kuji-box", "allocations", "by-product", productId],
-    queryFn: () => getKujiAllocationsByProduct(productId!),
-    enabled: !!productId,
+export function useKujiAllocationsByProduct(productId: string | null | undefined) {
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["kuji-box", "allocations", "by-product", siteId, productId],
+    queryFn:
+      siteId && productId
+        ? () => getSiteKujiAllocationsByProduct(siteId, productId)
+        : skipToken,
   });
+
+  return {
+    ...query,
+    isLoading: (Boolean(productId) && isSiteLoading) || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }

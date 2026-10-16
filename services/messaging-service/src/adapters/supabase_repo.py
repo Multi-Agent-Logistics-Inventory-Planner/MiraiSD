@@ -621,17 +621,20 @@ class SupabaseRepo:
             logger.error("Failed to create review: %s", e)
             return None
 
-    def increment_daily_count(self, employee_name: str, review_date, rate: int = 1) -> bool:
-        """Increment daily review count for a user.
+    def increment_daily_count(self, employee_name: str, review_date, site_id: str, rate: int = 1) -> bool:
+        """Increment daily review count for a user at a site.
 
         Uses UPSERT to create or increment review_count + coins_awarded together.
         `rate` is the review-to-coin multiplier captured at the start of the batch
         (see scheduler) and applied per row. Storing coins_awarded means a future
-        rate change cannot retroactively re-price past activity.
+        rate change cannot retroactively re-price past activity. `site_id` is the
+        site the review is attributed to (see get_review_site_id) — coin balances
+        are per-site, so this must never be inferred from the row itself.
 
         Args:
             employee_name: User's full name.
             review_date: Date of the review.
+            site_id: UUID (string) of the site this review's coins are earned at.
             rate: Coins to add per review. Defaults to 1.
 
         Returns:
@@ -643,9 +646,9 @@ class SupabaseRepo:
             return False
 
         query = text("""
-            INSERT INTO review_daily_counts (id, user_id, date, review_count, coins_awarded)
-            VALUES (gen_random_uuid(), :user_id, :date, 1, :rate)
-            ON CONFLICT (user_id, date)
+            INSERT INTO review_daily_counts (id, site_id, user_id, date, review_count, coins_awarded)
+            VALUES (gen_random_uuid(), :site_id, :user_id, :date, 1, :rate)
+            ON CONFLICT (site_id, user_id, date)
             DO UPDATE SET
                 review_count  = review_daily_counts.review_count + 1,
                 coins_awarded = review_daily_counts.coins_awarded + :rate
@@ -654,6 +657,7 @@ class SupabaseRepo:
         try:
             with self._engine.connect() as conn:
                 conn.execute(query, {
+                    "site_id": uuid.UUID(site_id),
                     "user_id": uuid.UUID(user_id),
                     "date": review_date,
                     "rate": int(rate),
@@ -663,6 +667,28 @@ class SupabaseRepo:
         except Exception as e:
             logger.error("Failed to increment daily count: %s", e)
             return False
+
+    def get_review_site_id(self) -> str:
+        """Resolve the site that GOOGLE_PLACE_URL's reviews are attributed to.
+
+        Reads config.REVIEW_SITE_CODE (default "MAIN") and looks up its UUID.
+        Called once per batch (see ReviewFetcher), same as get_review_coin_rate,
+        so a mid-batch config change can't split a batch across two sites.
+
+        Raises:
+            ValueError: if REVIEW_SITE_CODE does not match a row in `sites`.
+                Coin ledger rows are NOT NULL on site_id, so a review batch must
+                never proceed with an unresolved site.
+        """
+        query = text("SELECT id FROM sites WHERE code = :code")
+        with self._engine.connect() as conn:
+            result = conn.execute(query, {"code": config.REVIEW_SITE_CODE})
+            row = result.fetchone()
+            if row is None:
+                raise ValueError(
+                    f"REVIEW_SITE_CODE={config.REVIEW_SITE_CODE!r} does not match any site"
+                )
+            return str(row.id)
 
     def get_review_coin_rate(self) -> int:
         """Read the singleton review-to-coin rate from coin_economy_config.

@@ -310,7 +310,6 @@ function LocationDetailSheetContent({
     try {
       await clearDisplayMutation.mutateAsync({
         displayId: productToClear.id,
-        actorId: user?.personId,
       });
       toast({
         title: "Product removed",

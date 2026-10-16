@@ -5,7 +5,8 @@ import com.mirai.inventoryservice.dtos.assistant.DetailBundleDTO;
 import com.mirai.inventoryservice.dtos.assistant.HeaderBundleDTO;
 import com.mirai.inventoryservice.dtos.assistant.MovementRowDTO;
 import com.mirai.inventoryservice.dtos.assistant.MovementSummaryDTO;
-import com.mirai.inventoryservice.models.MachineDisplay;
+import com.mirai.inventoryservice.displays.application.ActiveDisplaySummary;
+import com.mirai.inventoryservice.displays.application.DisplayQueries;
 import com.mirai.inventoryservice.catalog.application.CatalogPricing;
 import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.CategoryRef;
@@ -15,12 +16,11 @@ import com.mirai.inventoryservice.models.analytics.DailySalesRollup;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
-import com.mirai.inventoryservice.models.shipment.ShipmentItem;
+import com.mirai.inventoryservice.shipments.domain.ShipmentItem;
 import com.mirai.inventoryservice.repositories.DailySalesRollupRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.inventory.application.InventoryQueries;
-import com.mirai.inventoryservice.repositories.MachineDisplayRepository;
-import com.mirai.inventoryservice.repositories.ShipmentItemRepository;
+import com.mirai.inventoryservice.shipments.infrastructure.ShipmentItemRepository;
 import com.mirai.inventoryservice.inventory.application.StockMovementHistoryEntry;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -65,7 +65,7 @@ public class ProductReportBundleService {
     private final DailySalesRollupRepository dailySalesRollupRepository;
     private final ForecastPredictionRepository forecastPredictionRepository;
     private final ShipmentItemRepository shipmentItemRepository;
-    private final MachineDisplayRepository machineDisplayRepository;
+    private final DisplayQueries displayQueries;
 
     // ---------- header ----------
 
@@ -114,7 +114,7 @@ public class ProductReportBundleService {
                 onePage);
         OffsetDateTime lastRestockAt = lastRestockRows.isEmpty() ? null : lastRestockRows.get(0).at();
 
-        boolean onDisplay = !machineDisplayRepository.findActiveByProduct_Id(productId).isEmpty();
+        boolean onDisplay = displayQueries.isProductOnDisplay(productId);
 
         String categoryName = categoryNameOf(product.categoryId());
 
@@ -166,7 +166,7 @@ public class ProductReportBundleService {
                 .findFirstByItemIdOrderByComputedAtDesc(productId);
         List<ShipmentItem> shipmentItems = shipmentItemRepository
                 .findRecentByItemIdWithShipment(productId, today.minusDays(SHIPMENT_WINDOW_DAYS));
-        List<MachineDisplay> displays = machineDisplayRepository.findActiveByProduct_Id(productId);
+        List<ActiveDisplaySummary> displays = displayQueries.findActiveByProduct(productId);
 
         String categoryName = categoryNameOf(product.categoryId());
 
@@ -239,11 +239,11 @@ public class ProductReportBundleService {
 
         List<DetailBundleDTO.ActiveDisplay> activeDisplays = displays.stream()
                 .map(md -> new DetailBundleDTO.ActiveDisplay(
-                        md.getId(),
-                        md.getLocation() != null ? md.getLocation().getId() : null,
-                        md.getLocationType() != null ? md.getLocationType().name() : null,
-                        md.getMachineId(),
-                        md.getStartedAt()))
+                        md.displayId(),
+                        md.locationId(),
+                        md.locationType() != null ? md.locationType().name() : null,
+                        md.machineId(),
+                        md.startedAt()))
                 .toList();
 
         return new DetailBundleDTO(

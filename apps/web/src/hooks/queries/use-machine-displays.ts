@@ -1,44 +1,61 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { useQuery, keepPreviousData, skipToken } from "@tanstack/react-query";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 import {
-  getActiveDisplays,
-  getActiveDisplaysByType,
-  getMachineHistoryPaged,
-  getProductDisplayHistory,
-  getActiveDisplaysForMachine,
-} from "@/lib/api/machine-displays";
+  getSiteActiveDisplays,
+  getSiteActiveDisplaysByType,
+  getSiteMachineHistoryPaged,
+  getSiteProductDisplayHistory,
+  getSiteActiveDisplaysForMachine,
+} from "@/lib/api/site-machine-displays";
 import { LocationType, MachineDisplay } from "@/types/api";
 
 /** Displays older than this threshold are considered stale */
 export const STALE_DISPLAY_THRESHOLD_DAYS = 45;
 
 /**
- * Fetch all active machine displays
+ * Fetch all active machine displays at the current site
  */
 export function useActiveDisplays() {
-  return useQuery({
-    queryKey: ["machine-displays", "active"],
-    queryFn: getActiveDisplays,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["machine-displays", siteId, "active"],
+    queryFn: siteId ? () => getSiteActiveDisplays(siteId) : skipToken,
     staleTime: 10 * 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: isSiteLoading || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 /**
- * Fetch active displays for a specific location type
+ * Fetch active displays for a specific location type at the current site
  */
 export function useActiveDisplaysByType(locationType?: LocationType) {
-  return useQuery({
-    queryKey: ["machine-displays", "active", "by-type", locationType],
-    queryFn: () => getActiveDisplaysByType(locationType!),
-    enabled: !!locationType,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["machine-displays", siteId, "active", "by-type", locationType],
+    queryFn:
+      siteId && locationType ? () => getSiteActiveDisplaysByType(siteId, locationType) : skipToken,
     staleTime: 10 * 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: isSiteLoading || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 /**
- * Fetch display history for a machine with pagination
+ * Fetch display history for a machine at the current site with pagination
  */
 export function useMachineDisplayHistoryPaged(
   locationType?: LocationType,
@@ -46,40 +63,67 @@ export function useMachineDisplayHistoryPaged(
   page: number = 0,
   size: number = 10
 ) {
-  return useQuery({
-    queryKey: ["machine-displays", "history", "paged", locationType, machineId, page, size],
-    queryFn: () => getMachineHistoryPaged(locationType!, machineId!, page, size),
-    enabled: !!locationType && !!machineId,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["machine-displays", siteId, "history", "paged", locationType, machineId, page, size],
+    queryFn:
+      siteId && locationType && machineId
+        ? () => getSiteMachineHistoryPaged(siteId, locationType, machineId, page, size)
+        : skipToken,
     placeholderData: keepPreviousData,
     staleTime: 10 * 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: isSiteLoading || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 /**
- * Fetch display history for a product
+ * Fetch display history for a product at the current site
  */
 export function useProductDisplayHistory(productId?: string) {
-  return useQuery({
-    queryKey: ["machine-displays", "product-history", productId],
-    queryFn: () => getProductDisplayHistory(productId!),
-    enabled: !!productId,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["machine-displays", siteId, "product-history", productId],
+    queryFn: siteId && productId ? () => getSiteProductDisplayHistory(siteId, productId) : skipToken,
     staleTime: 10 * 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: isSiteLoading || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 /**
- * Fetch all active displays for a specific machine
+ * Fetch all active displays for a specific machine at the current site
  */
 export function useActiveDisplaysForMachine(
   locationType?: LocationType,
   machineId?: string
 ) {
-  return useQuery({
-    queryKey: ["machine-displays", "machine-active", locationType, machineId],
-    queryFn: () => getActiveDisplaysForMachine(locationType!, machineId!),
-    enabled: !!locationType && !!machineId,
+  const { siteId, isLoading: isSiteLoading, error: siteError } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["machine-displays", siteId, "machine-active", locationType, machineId],
+    queryFn:
+      siteId && locationType && machineId
+        ? () => getSiteActiveDisplaysForMachine(siteId, locationType, machineId)
+        : skipToken,
     staleTime: 10 * 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: isSiteLoading || query.isLoading,
+    error: siteError ?? query.error,
+  };
 }
 
 /**

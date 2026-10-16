@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, skipToken } from "@tanstack/react-query";
 import { OrdersCard } from "./orders-card";
 import { StockStatusCard } from "./stock-status-card";
 import { HighestDemandCard } from "./highest-demand-card";
@@ -9,7 +9,8 @@ import { SupplyChainStatusCard } from "./supply-chain-status-card";
 import { useProducts } from "@/hooks/queries/use-products";
 import { useShipmentDisplayStatusCounts } from "@/hooks/queries/use-shipments";
 import { useHighestDemandForecast } from "@/hooks/queries/use-forecasts";
-import { getShipmentsPaged } from "@/lib/api/shipments";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { getSiteShipmentsPaged } from "@/lib/api/site-shipments";
 import { type Shipment } from "@/types/api";
 
 function getNextArrivingShipment(shipments: Shipment[]): Shipment | null {
@@ -91,13 +92,16 @@ export function ConnectedHighestDemandCard() {
  * Fetches only active shipments (PENDING/IN_TRANSIT with no received items) to find next arriving
  */
 export function ConnectedSupplyChainStatusCard() {
+  const { siteId, isLoading: isSiteLoading } = useCurrentSite();
   const shipmentsQuery = useQuery({
-    queryKey: ["shipments", "active-for-supply-chain"],
-    queryFn: async () => {
-      // Only fetch ACTIVE display status shipments (reduces payload significantly)
-      const response = await getShipmentsPaged({ displayStatus: "ACTIVE" }, 0, 20);
-      return response.content;
-    },
+    queryKey: ["shipments", siteId, "active-for-supply-chain"],
+    queryFn: siteId
+      ? async () => {
+          // Only fetch ACTIVE display status shipments (reduces payload significantly)
+          const response = await getSiteShipmentsPaged(siteId, { displayStatus: "ACTIVE" }, 0, 20);
+          return response.content;
+        }
+      : skipToken,
     staleTime: 5 * 60 * 1000, // 5 minutes - supply chain status doesn't need real-time updates
   });
 
@@ -116,7 +120,7 @@ export function ConnectedSupplyChainStatusCard() {
     <SupplyChainStatusCard
       nextShipment={supplyChainData.nextShipment}
       additionalShipmentCount={supplyChainData.additionalCount}
-      isLoading={shipmentsQuery.isLoading}
+      isLoading={isSiteLoading || shipmentsQuery.isLoading}
     />
   );
 }

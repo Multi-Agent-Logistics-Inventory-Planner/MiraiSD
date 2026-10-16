@@ -32,7 +32,7 @@ public class OpenApiConfig {
     private static final List<String> PUBLIC_PATH_PATTERNS = List.of(
             "/api/auth/validate", "/api/auth/session",
             "/health", "/actuator/health", "/actuator/health/**",
-            "/api/webhooks/**", "/v3/api-docs/**");
+            "/api/webhooks/**", "/api/v1/webhooks/**", "/v3/api-docs/**");
 
     @Bean
     public OpenAPI openApi() {

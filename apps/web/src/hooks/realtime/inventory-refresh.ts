@@ -290,14 +290,11 @@ export async function flushInventorySiteRefresh(
 
   await Promise.all(
     uniqueIds.flatMap((id) => [
+      // The Kuji dialogs (tier-edit-dialog.tsx, transfer-in-dialog.tsx, tier-draft-ui.tsx) now
+      // read useSiteProductInventoryEntries too (Phase 7 web migration), so this one,
+      // site-qualified invalidation covers them - the legacy, unscoped two-element key
+      // (["productInventoryEntries", id]) has no remaining caller and was dropped.
       queryClient.invalidateQueries({ queryKey: ["productInventoryEntries", siteId, id] }),
-      // Legacy, unscoped two-element key (6e independent review, Required 4): the Kuji dialogs
-      // (tier-edit-dialog.tsx, transfer-in-dialog.tsx, tier-draft-ui.tsx) still read
-      // useProductInventoryEntries, which uses this key, not the site-qualified one. Neither
-      // this executor nor the broadcast handler invalidated it after 6e's site-scoping, so
-      // those dialogs would never see a targeted refresh. Kept until Kuji's own site migration
-      // (Phase 7) removes this key's last caller.
-      queryClient.invalidateQueries({ queryKey: ["productInventoryEntries", id] }),
       queryClient.invalidateQueries({ queryKey: ["movementHistory", siteId, id] }),
     ])
   );

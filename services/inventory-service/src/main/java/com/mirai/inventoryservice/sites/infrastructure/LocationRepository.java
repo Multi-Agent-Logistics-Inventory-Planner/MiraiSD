@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,6 +32,15 @@ public interface LocationRepository extends JpaRepository<Location, UUID> {
 
     @Query("SELECT l FROM Location l JOIN FETCH l.storageLocation sl JOIN FETCH sl.site WHERE l.id = :id AND sl.site.id = :siteId")
     Optional<Location> findByIdAndSite_Id(@Param("id") UUID id, @Param("siteId") UUID siteId);
+
+    /**
+     * Bulk site-scoped variant of {@link #findByIdAndSite_Id} (.specs/phase-7-shipments AC-2,
+     * review finding): a foreign-site location id is excluded by the query itself, not filtered
+     * out afterward, so a caller enriching a batch of DTOs never even materializes a row it isn't
+     * allowed to see.
+     */
+    @Query("SELECT l FROM Location l JOIN FETCH l.storageLocation sl JOIN FETCH sl.site WHERE l.id IN :ids AND sl.site.id = :siteId")
+    List<Location> findByIdInAndSite_Id(@Param("ids") Collection<UUID> ids, @Param("siteId") UUID siteId);
 
     @Query("SELECT l FROM Location l JOIN FETCH l.storageLocation sl JOIN FETCH sl.site WHERE sl.code = :storageLocationCode AND sl.site.id = :siteId")
     List<Location> findByStorageLocationCodeAndSiteId(@Param("storageLocationCode") String storageLocationCode, @Param("siteId") UUID siteId);

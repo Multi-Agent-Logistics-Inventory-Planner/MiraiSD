@@ -75,6 +75,25 @@ explicit split. The route list is complete as of the capture date.
   `Sunset`) pointing back at this document. `LocationInventoryController`'s row above remains
   unimplemented v1 (R-9, `.specs/phase-6-inventory/log.md`) pending a catalog-owned
   application-layer product-summary read contract.
+- Phase 7 (.specs/phase-7-shipments, T-5): `/api/v1/sites/{siteId}/shipments` (all 11 CRUD/status/
+  receive/undo mappings, `SiteShipmentController`), `/api/v1/sites/{siteId}/tracking` (both
+  mappings, `SiteTrackingController`), and `/api/v1/webhooks/easypost` (mapped on the same handler
+  as the legacy route, since the caller has no site to put in the path -- it already resolves the
+  target `Shipment`'s site server-side, per T-2). `apps/web`'s shipment/tracking consumers are
+  migrated to the v1 routes (`lib/api/site-shipments.ts`, `lib/api/site-tracking.ts`). Legacy
+  `/api/shipments/*`, `/api/tracking/*` and `/api/webhooks/*` gained `Deprecation`/`Link` headers
+  (no `Sunset`) pointing back at this document. EasyPost's actual webhook subscription still
+  points at the legacy path; repointing it at `/api/v1/webhooks/easypost` is an external
+  operational step, not part of this code change.
+- Phase 7 (.specs/phase-7-displays, T-4): `/api/v1/sites/{siteId}/machine-displays` (all 19
+  mappings, `SiteMachineDisplayController`), site-authorized against
+  `shared.web.AuthorizedSiteContextHolder` before any entity lookup (AC-3) -- a foreign-site
+  machine or display id is "not found," not the other site's data (proven by
+  `SiteMachineDisplayControllerCrossSiteAccessIT`). `apps/web`'s machine-display consumers are
+  migrated to the v1 routes (`lib/api/site-machine-displays.ts`, `hooks/queries/
+  use-machine-displays.ts`, `hooks/mutations/use-machine-display-mutations.ts`). Legacy
+  `/api/machine-displays/*` gained `Deprecation`/`Link` headers (no `Sunset`) pointing back at this
+  document.
 
 ## Compatibility removal gate
 

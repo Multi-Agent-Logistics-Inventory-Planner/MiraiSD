@@ -1,0 +1,102 @@
+package com.mirai.inventoryservice.kuji.domain;
+
+import com.mirai.inventoryservice.catalog.domain.Product;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+@Entity
+@Table(name = "kuji_box_tiers",
+        indexes = {
+                @Index(name = "idx_kuji_box_tiers_box", columnList = "box_id"),
+                @Index(name = "idx_kuji_box_tiers_linked_product", columnList = "linked_product_id")
+        })
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class KujiBoxTier {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "box_id", nullable = false)
+    @ToString.Exclude
+    private KujiBox box;
+
+    @NotBlank
+    @Column(nullable = false, length = 120)
+    private String label;
+
+    @Column(length = 50)
+    private String letter;
+
+    /**
+     * Optional link to a stocked product. When set, open-box decrements this product's
+     * LocationInventory at the source location. Slip counts (active/inactive) live only
+     * on this tier and are not coupled to LocationInventory after open-box.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "linked_product_id")
+    @ToString.Exclude
+    private Product linkedProduct;
+
+    /** Direct access to FK column for fast lookups without lazy loading. */
+    @Column(name = "linked_product_id", insertable = false, updatable = false)
+    private UUID linkedProductId;
+
+    /** Inherited from {@link #box}'s site (.specs/phase-7-kuji-lootbox T-2); see KujiBox.siteId. */
+    @Column(name = "site_id", nullable = false)
+    private UUID siteId;
+
+    /** Slips currently winnable / on a slip in the box. */
+    @NotNull
+    @Column(name = "active_count", nullable = false)
+    private Integer activeCount;
+
+    /** Slips held back from the pool (kuji-internal, not on a slip). */
+    @NotNull
+    @Column(name = "inactive_count", nullable = false)
+    @Builder.Default
+    private Integer inactiveCount = 0;
+
+    /** Cumulative slips drawn in the current box session (since openedAt). */
+    @NotNull
+    @Column(name = "drawn_count", nullable = false)
+    @Builder.Default
+    private Integer drawnCount = 0;
+
+    @Column(precision = 10, scale = 2)
+    private BigDecimal price;
+
+    /**
+     * True when the linked product was auto-created at open-box (one-shot prize for
+     * this box only). At close-box such products are soft-deleted and their images
+     * are hard-deleted from storage.
+     */
+    @NotNull
+    @Column(name = "auto_created_product", nullable = false)
+    @Builder.Default
+    private Boolean autoCreatedProduct = false;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private OffsetDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
+}

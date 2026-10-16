@@ -1,0 +1,121 @@
+package com.mirai.inventoryservice.shipments.domain;
+
+import com.mirai.inventoryservice.catalog.domain.Supplier;
+import com.mirai.inventoryservice.identity.domain.User;
+import com.mirai.inventoryservice.models.enums.CarrierStatus;
+import com.mirai.inventoryservice.models.enums.ShipmentStatus;
+import com.mirai.inventoryservice.sites.domain.Site;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = "shipments")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class Shipment {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    @Column(name = "shipment_number")
+    private String shipmentNumber;
+
+    @Column(name = "supplier_name")
+    private String supplierName;
+
+    /**
+     * Reference to normalized supplier entity.
+     * May be null for legacy shipments before supplier normalization.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "supplier_id")
+    private Supplier supplier;
+
+    /**
+     * Direct access to FK column to avoid lazy loading when only ID is needed.
+     */
+    @Column(name = "supplier_id", insertable = false, updatable = false)
+    private UUID supplierId;
+
+    /**
+     * The site this shipment belongs to. Nullable at the JPA level because the underlying column
+     * (V69) is expand-phase nullable pending a separate constraining migration (.specs/
+     * phase-7-shipments T-3) once every writer is confirmed to set it; every production write
+     * path sets it explicitly, derived from the caller's authorized site context.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "site_id")
+    private Site site;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private ShipmentStatus status = ShipmentStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "carrier_status")
+    private CarrierStatus carrierStatus;
+
+    @Column(name = "carrier_delivered_at")
+    private OffsetDateTime carrierDeliveredAt;
+
+    @NotNull
+    @Column(name = "order_date", nullable = false)
+    @Builder.Default
+    private LocalDate orderDate = LocalDate.now();
+
+    @Column(name = "expected_delivery_date")
+    private LocalDate expectedDeliveryDate;
+
+    @Column(name = "actual_delivery_date")
+    private LocalDate actualDeliveryDate;
+
+    @Column(name = "total_cost")
+    private BigDecimal totalCost;
+
+    @Column(columnDefinition = "text")
+    private String notes;
+
+    @Column(name = "tracking_id")
+    private String trackingId;
+
+    @Column(name = "easypost_tracker_id")
+    private String easypostTrackerId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by")
+    private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "received_by")
+    private User receivedBy;
+
+    @OneToMany(mappedBy = "shipment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @org.hibernate.annotations.BatchSize(size = 50)
+    @Builder.Default
+    private List<ShipmentItem> items = new ArrayList<>();
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private OffsetDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private OffsetDateTime updatedAt;
+}
