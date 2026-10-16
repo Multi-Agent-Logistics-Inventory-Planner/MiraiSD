@@ -32,8 +32,20 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("UPDATE User u SET u.supabaseUserId = :supabaseUserId WHERE u.id = :id AND u.supabaseUserId IS NULL")
     int backfillSupabaseUserId(@Param("id") UUID id, @Param("supabaseUserId") UUID supabaseUserId);
 
-    // Review tracking methods
-    List<User> findByIsReviewTrackedTrueOrderByFullNameAsc();
-    List<User> findAllByOrderByFullNameAsc();
+    @Query("SELECT u FROM User u WHERE u.id IN (SELECT m.userId FROM UserSiteMembership m "
+            + "WHERE m.siteId = :siteId AND m.isActive = true) ORDER BY u.fullName ASC")
+    List<User> findActiveSiteMembers(@Param("siteId") UUID siteId);
+
+    @Query("SELECT u FROM User u WHERE u.isReviewTracked = true AND u.id IN (SELECT m.userId "
+            + "FROM UserSiteMembership m WHERE m.siteId = :siteId AND m.isActive = true) ORDER BY u.fullName ASC")
+    List<User> findTrackedActiveSiteMembers(@Param("siteId") UUID siteId);
+
+    @Query("SELECT u FROM User u WHERE u.id = :userId AND u.id IN (SELECT m.userId FROM UserSiteMembership m "
+            + "WHERE m.siteId = :siteId)")
+    Optional<User> findSiteMember(@Param("siteId") UUID siteId, @Param("userId") UUID userId);
+
+    @Query("SELECT u FROM User u WHERE u.id = :userId AND u.id IN (SELECT m.userId FROM UserSiteMembership m "
+            + "WHERE m.siteId = :siteId AND m.isActive = true)")
+    Optional<User> findActiveSiteMember(@Param("siteId") UUID siteId, @Param("userId") UUID userId);
 }
 

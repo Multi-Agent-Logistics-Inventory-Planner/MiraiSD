@@ -82,6 +82,24 @@ class SupabaseBroadcastServiceTest {
         assertThat(payload.has("itemId")).isFalse();
     }
 
+    @Test
+    void buildNotificationCreatedPayload_includesSiteId_whenPresent() {
+        SupabaseBroadcastService service = new SupabaseBroadcastService(null);
+        UUID siteId = UUID.randomUUID();
+
+        ObjectNode payload = service.buildNotificationCreatedPayload(siteId);
+
+        assertThat(payload.get("type").asText()).isEqualTo("notification_created");
+        assertThat(payload.get("siteId").asText()).isEqualTo(siteId.toString());
+    }
+
+    @Test
+    void buildNotificationCreatedPayload_omitsSiteId_whenNull() {
+        SupabaseBroadcastService service = new SupabaseBroadcastService(null);
+
+        assertThat(service.buildNotificationCreatedPayload(null).has("siteId")).isFalse();
+    }
+
     // --- After-commit dispatch (T-6e-be-6) ---------------------------------------------------
 
     @Test
@@ -89,9 +107,10 @@ class SupabaseBroadcastServiceTest {
         SupabaseBroadcastService self = mock(SupabaseBroadcastService.class);
         SupabaseBroadcastService service = new SupabaseBroadcastService(self);
 
-        service.broadcastNotificationCreated();
+        UUID siteId = UUID.randomUUID();
+        service.broadcastNotificationCreated(siteId);
 
-        verify(self, times(1)).dispatchNotificationCreated();
+        verify(self, times(1)).dispatchNotificationCreated(siteId);
     }
 
     @Test
@@ -101,13 +120,14 @@ class SupabaseBroadcastServiceTest {
 
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
-        service.broadcastNotificationCreated();
-        verify(self, never()).dispatchNotificationCreated();
+        UUID siteId = UUID.randomUUID();
+        service.broadcastNotificationCreated(siteId);
+        verify(self, never()).dispatchNotificationCreated(siteId);
 
         for (TransactionSynchronization sync : TransactionSynchronizationManager.getSynchronizations()) {
             sync.afterCommit();
         }
-        verify(self, times(1)).dispatchNotificationCreated();
+        verify(self, times(1)).dispatchNotificationCreated(siteId);
     }
 
     @Test
@@ -117,12 +137,13 @@ class SupabaseBroadcastServiceTest {
 
         TransactionSynchronizationManager.initSynchronization();
         TransactionSynchronizationManager.setActualTransactionActive(true);
-        service.broadcastNotificationCreated();
+        UUID siteId = UUID.randomUUID();
+        service.broadcastNotificationCreated(siteId);
         // Simulate rollback: the transaction manager clears synchronizations without ever
         // invoking afterCommit() on them.
         TransactionSynchronizationManager.clearSynchronization();
 
-        verify(self, never()).dispatchNotificationCreated();
+        verify(self, never()).dispatchNotificationCreated(siteId);
     }
 
     @Test
@@ -138,9 +159,10 @@ class SupabaseBroadcastServiceTest {
 
         TransactionSynchronizationManager.initSynchronization();
         // Deliberately NOT calling setActualTransactionActive(true) here.
-        service.broadcastNotificationCreated();
+        UUID siteId = UUID.randomUUID();
+        service.broadcastNotificationCreated(siteId);
 
-        verify(self, times(1)).dispatchNotificationCreated();
+        verify(self, times(1)).dispatchNotificationCreated(siteId);
     }
 
     @Test

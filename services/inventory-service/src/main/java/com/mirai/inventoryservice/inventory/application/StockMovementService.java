@@ -14,7 +14,8 @@ import com.mirai.inventoryservice.catalog.application.CatalogQueries;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.catalog.application.ProductStockStateWriter;
 import com.mirai.inventoryservice.sites.domain.Site;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
@@ -62,7 +63,7 @@ import java.util.stream.Collectors;
 @Service
 public class StockMovementService {
     private final StockMovementRepository stockMovementRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final CatalogQueries catalogQueries;
     private final ProductStockStateWriter productStockStateWriter;
     private final UserRepository userRepository;
@@ -75,7 +76,7 @@ public class StockMovementService {
 
     public StockMovementService(
             StockMovementRepository stockMovementRepository,
-            AuditLogRepository auditLogRepository,
+            AuditLogService auditLogService,
             CatalogQueries catalogQueries,
             ProductStockStateWriter productStockStateWriter,
             UserRepository userRepository,
@@ -86,7 +87,7 @@ public class StockMovementService {
             SupabaseBroadcastService broadcastService,
             @org.springframework.context.annotation.Lazy EventOutboxService eventOutboxService) {
         this.stockMovementRepository = stockMovementRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.auditLogService = auditLogService;
         this.catalogQueries = catalogQueries;
         this.productStockStateWriter = productStockStateWriter;
         this.userRepository = userRepository;
@@ -220,6 +221,7 @@ public class StockMovementService {
                 : lines.size() + " products";
 
         AuditLog auditLog = createAuditLog(
+                siteIdOf(first.getLocation()),
                 request.getActorId(),
                 request.getReason(),
                 null,
@@ -607,6 +609,7 @@ public class StockMovementService {
         String destLocationCode = resolveLocationCode(destLocationId);
 
         AuditLog auditLog = createAuditLog(
+                siteIdOf(sourceInventory.getLocation()),
                 request.getActorId(),
                 StockMovementReason.TRANSFER,
                 sourceLocationId,
@@ -704,6 +707,7 @@ public class StockMovementService {
                 : transfers.size() + " products";
 
         AuditLog auditLog = createAuditLog(
+                siteIdOf(firstSource.getLocation()),
                 first.getActorId(),
                 StockMovementReason.TRANSFER,
                 sourceLocationId,
@@ -981,6 +985,7 @@ public class StockMovementService {
         LocationType derivedLocationType = mapStorageLocationCodeToLocationType(storageLocationCode);
 
         AuditLog auditLog = createAuditLog(
+                siteIdOf(location),
                 actorId,
                 reason,
                 null,
@@ -1057,6 +1062,7 @@ public class StockMovementService {
         locationInventoryRepository.delete(inventory);
 
         AuditLog auditLog = createAuditLog(
+                siteIdOf(location),
                 actorId,
                 reason,
                 locationId,
@@ -1222,7 +1228,12 @@ public class StockMovementService {
     /**
      * Create an audit log entry for a stock movement action.
      */
+    private static UUID siteIdOf(Location location) {
+        return location.getStorageLocation().getSite().getId();
+    }
+
     private AuditLog createAuditLog(
+            UUID siteId,
             UUID actorId,
             StockMovementReason reason,
             UUID fromLocationId,
@@ -1242,6 +1253,7 @@ public class StockMovementService {
         }
 
         AuditLog auditLog = AuditLog.builder()
+                .siteId(siteId)
                 .user(user)
                 .actorName(actorName)
                 .reason(reason)
@@ -1255,6 +1267,6 @@ public class StockMovementService {
                 .notes(notes)
                 .build();
 
-        return auditLogRepository.save(auditLog);
+        return auditLogService.save(auditLog);
     }
 }

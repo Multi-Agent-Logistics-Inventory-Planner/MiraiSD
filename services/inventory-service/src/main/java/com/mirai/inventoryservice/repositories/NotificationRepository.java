@@ -1,62 +1,19 @@
 package com.mirai.inventoryservice.repositories;
 
 import com.mirai.inventoryservice.models.audit.Notification;
-import com.mirai.inventoryservice.models.enums.NotificationSeverity;
-import com.mirai.inventoryservice.models.enums.NotificationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface NotificationRepository extends JpaRepository<Notification, UUID>, JpaSpecificationExecutor<Notification> {
-    // Find undelivered notifications
-    List<Notification> findByDeliveredAtIsNullOrderByCreatedAtDesc();
+public interface NotificationRepository extends JpaRepository<Notification, UUID> {
+    Page<Notification> findBySiteIdOrderByCreatedAtDesc(UUID siteId, Pageable pageable);
 
-    // Find notifications for a specific recipient
-    List<Notification> findByRecipientIdOrderByCreatedAtDesc(UUID recipientId);
-
-    // Find notifications for a specific recipient OR broadcast notifications (recipient_id IS NULL)
-    @Query("SELECT n FROM Notification n WHERE n.recipientId = :recipientId OR n.recipientId IS NULL ORDER BY n.createdAt DESC")
-    List<Notification> findByRecipientIdOrBroadcastOrderByCreatedAtDesc(@Param("recipientId") UUID recipientId);
-
-    // Find undelivered notifications for a specific recipient
-    List<Notification> findByRecipientIdAndDeliveredAtIsNullOrderByCreatedAtDesc(UUID recipientId);
-
-    // Find undelivered notifications for a specific recipient OR broadcast notifications
-    @Query("SELECT n FROM Notification n WHERE (n.recipientId = :recipientId OR n.recipientId IS NULL) AND n.deliveredAt IS NULL ORDER BY n.createdAt DESC")
-    List<Notification> findUnreadByRecipientIdOrBroadcastOrderByCreatedAtDesc(@Param("recipientId") UUID recipientId);
-
-    // Find by type
-    List<Notification> findByTypeOrderByCreatedAtDesc(NotificationType type);
-
-    // Find by severity
-    List<Notification> findBySeverityOrderByCreatedAtDesc(NotificationSeverity severity);
-
-    // Count active (unresolved) notifications
-    long countByResolvedAtIsNull();
-
-    // Count resolved notifications
-    long countByResolvedAtIsNotNull();
-
-    // Count unread active notifications (not resolved AND not read by user)
-    long countByResolvedAtIsNullAndReadAtIsNull();
-
-    // Paginated: find all notifications ordered by createdAt desc
-    Page<Notification> findAllByOrderByCreatedAtDesc(Pageable pageable);
-
-    // Paginated: find unresolved notifications (for activity feed)
-    @Query("SELECT n FROM Notification n WHERE n.resolvedAt IS NULL ORDER BY n.createdAt DESC")
-    Page<Notification> findUnresolvedOrderByCreatedAtDesc(Pageable pageable);
-
-    // Paginated: find notifications for a specific recipient OR broadcast
-    @Query("SELECT n FROM Notification n WHERE n.recipientId = :recipientId OR n.recipientId IS NULL ORDER BY n.createdAt DESC")
-    Page<Notification> findByRecipientIdOrBroadcastOrderByCreatedAtDesc(@Param("recipientId") UUID recipientId, Pageable pageable);
+    @Query("SELECT n FROM Notification n WHERE n.siteId = :siteId AND n.resolvedAt IS NULL ORDER BY n.createdAt DESC")
+    Page<Notification> findUnresolvedBySiteIdOrderByCreatedAtDesc(@Param("siteId") UUID siteId, Pageable pageable);
 }
-

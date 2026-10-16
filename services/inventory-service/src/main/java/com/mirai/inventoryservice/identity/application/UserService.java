@@ -54,6 +54,29 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
     }
 
+    public List<User> findActiveSiteMembers(UUID siteId) {
+        return userRepository.findActiveSiteMembers(siteId);
+    }
+
+    public List<User> findTrackedSiteMembers(UUID siteId) {
+        return userRepository.findTrackedActiveSiteMembers(siteId);
+    }
+
+    /** A user with any membership row at the site, including a deactivated one (read paths). */
+    public Optional<User> findSiteMember(UUID siteId, UUID userId) {
+        return userRepository.findSiteMember(siteId, userId);
+    }
+
+    /** A user with an active membership at the site (write paths). */
+    public Optional<User> findActiveSiteMember(UUID siteId, UUID userId) {
+        return userRepository.findActiveSiteMember(siteId, userId);
+    }
+
+    @Transactional
+    public User save(User user) {
+        return userRepository.save(user);
+    }
+
     /**
      * Tolerant variant of {@link #getUserById(UUID)} for callers that treat a missing/invalid id
      * as "no actor", not an error (e.g. an optional {@code receivedBy}/{@code createdBy} on a

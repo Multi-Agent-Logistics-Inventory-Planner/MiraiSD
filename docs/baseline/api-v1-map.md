@@ -39,7 +39,7 @@ explicit split. The route list is complete as of the capture date.
 | `LootboxAdminController /api/lootbox/admin` | 21 | Site-owned operations | `/api/v1/sites/{siteId}/lootbox/admin` | Coin configuration may later move to global config; all operational reads/writes are site scoped now |
 | `LootboxController /api/lootbox` | 7 | Site-owned operations | `/api/v1/sites/{siteId}/lootbox` | Balance/history results must identify or filter by site policy |
 | `MachineDisplayController /api/machine-displays` | 19 | Site-owned | `/api/v1/sites/{siteId}/machine-displays` | All active/history/stale/batch/swap mappings |
-| `NotificationController /api/notifications` | 11 | Site-owned recipient data | `/api/v1/sites/{siteId}/notifications` | All list/count/read/resolve/delete mappings |
+| `NotificationController /api/notifications` | 11 | Removed (no consumers) | none | Deleted; notifications are a Slack delivery queue only |
 | `ProductController /api/products` | 10 | Split global/site | `/api/v1/catalog/products` and `/api/v1/sites/{siteId}/products` | Master CRUD/lookup is global; activate/deactivate and local settings become site assortment operations |
 | `ReviewController /api/reviews` | 7 | Site-owned | `/api/v1/sites/{siteId}/reviews` | Tracking, summaries, user reviews and stats are site filtered |
 | `ShipmentController /api/shipments` | 11 | Site-owned | `/api/v1/sites/{siteId}/shipments` | All CRUD, status, receive and undo mappings |
@@ -94,6 +94,22 @@ explicit split. The route list is complete as of the capture date.
   use-machine-displays.ts`, `hooks/mutations/use-machine-display-mutations.ts`). Legacy
   `/api/machine-displays/*` gained `Deprecation`/`Link` headers (no `Sunset`) pointing back at this
   document.
+- Phase 7 (.specs/phase-7-notifications-reviews-audit, T-4): `/api/v1/sites/{siteId}/audit-logs`
+  (list and detail, `SiteAuditLogController`) and `/api/v1/sites/{siteId}/reviews` (all 7 mappings,
+  `SiteReviewController`), site-authorized against `shared.web.AuthorizedSiteContextHolder` before
+  any lookup. A foreign-site audit-log id and a user who is not an active member of the site are
+  "not found" (proven by `SiteAuditLogControllerAuthorizationIT` and
+  `SiteReviewControllerAuthorizationIT`). Review summaries, stats, rank and review lists are
+  filtered to the site; the tracked-user and management lists contain only the site's active
+  members. `apps/web`'s audit-log and review consumers are migrated (`lib/api/site-audit-logs.ts`,
+  `lib/api/site-reviews.ts`, `hooks/queries/use-audit-log.ts`, `use-top-reviewers.ts`).
+  Legacy `/api/audit-logs/*` and `/api/reviews/*` resolve MAIN and gained `Deprecation`/`Link`
+  headers (no `Sunset`). The tracking flag and name variants on a user (`isReviewTracked`,
+  `canonicalName`, `nameVariants`) are still global user attributes; the site route only
+  requires membership at the site. `/api/stock-movements/audit-log` was already MAIN-scoped and
+  stays on the inventory slice's deprecation path. `/api/notifications` gained no v1 equivalent
+  and was deleted with its web code; the table stays as the Slack delivery queue (now carrying
+  `site_id`).
 
 ## Compatibility removal gate
 

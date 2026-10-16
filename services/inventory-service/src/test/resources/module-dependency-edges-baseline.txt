@@ -396,8 +396,6 @@ catalog -> services
 catalog -> shared
 catalog -> sites
 config -> identity
-config -> models
-config -> repositories
 controllers -> analytics
 controllers -> catalog
 controllers -> dtos
@@ -421,10 +419,8 @@ dtos -> catalog
 dtos -> identity
 dtos -> inventory
 dtos -> models
-dtos -> services
 dtos -> shipments
 dtos -> sites
-dtos -> validation
 exceptions -> catalog
 exceptions -> identity
 exceptions -> inventory
@@ -437,7 +433,6 @@ inventory -> catalog
 inventory -> dtos
 inventory -> identity
 inventory -> models
-inventory -> repositories
 inventory -> services
 inventory -> shared
 inventory -> sites
@@ -458,25 +453,14 @@ kuji -> sites
 lootbox -> dtos
 lootbox -> exceptions
 lootbox -> identity
-lootbox -> models
-lootbox -> repositories
 lootbox -> services
 lootbox -> shared
 lootbox -> sites
-models -> catalog
-models -> displays
-models -> identity
-models -> inventory
-models -> sites
 repositories -> dtos
-repositories -> identity
 repositories -> models
-repositories -> utils
 services -> catalog
 services -> displays
 services -> dtos
-services -> exceptions
-services -> identity
 services -> inventory
 services -> kafka
 services -> models
@@ -497,6 +481,48 @@ sites -> models
 sites -> shared
 sites -> identity
 sites -> utils
-validation -> dtos
 validation -> inventory
 validation -> models
+# Reviewed additions (2026-10-15, .specs/phase-7-notifications-reviews-audit T-4): the audit stack
+# (AuditLog, AuditLogRepository/Specifications, AuditLogService, AuditLogDTO/DetailDTO/DTOMapper,
+# AuditLogController) moved from the legacy models/repositories/services/dtos/controllers packages
+# into `audit`. Every `audit -> X` line below is the same dependency the classes already had under
+# their old package name, not new coupling: `audit -> inventory` (StockMovement and InventoryQueries;
+# AuditLog <-> StockMovement is a mutual JPA association that already formed a models <-> inventory
+# cycle), `audit -> identity` (UserService and the User entity), `audit -> catalog` (Product in the movement
+# read model), `audit -> models` (StockMovementReason and other shared enums), `audit -> dtos`
+# (AuditLogFilterDTO/AuditLogEntryDTO stay legacy because the stock-movement audit view shares
+# them), `audit -> services` (SupabaseBroadcastService, still legacy), `audit -> shared`
+# (AuthorizedSiteContextHolder in the v1 controller). The `X -> audit` lines are the callers that
+# used to reach the legacy classes: inventory, shipments, displays, kuji (audit writers),
+# services (ActivityFeedService) and controllers (dev seed). Repository access from outside
+# `audit` was removed: StockMovementService and ActivityFeedService now go through AuditLogService.
+audit -> catalog
+audit -> dtos
+audit -> identity
+audit -> inventory
+audit -> models
+audit -> services
+audit -> shared
+controllers -> audit
+displays -> audit
+inventory -> audit
+kuji -> audit
+services -> audit
+shipments -> audit
+# Reviewed additions (2026-10-15, .specs/phase-7-notifications-reviews-audit T-4, reviews module move):
+# Review, ReviewDailyCount, their repositories, ReviewService, the review DTOs and the legacy and
+# site controllers moved from the legacy packages into `reviews`. `reviews -> identity` is
+# UserService (site-member lookup) and the User entity; the module exposes its own ReviewUserDTO so
+# it no longer returns identity.api.UserResponseDTO. `reviews -> shared` is
+# AuthorizedSiteContextHolder in SiteReviewController. `lootbox -> reviews` is LootboxService reading
+# ReviewDailyCount through ReviewDailyCountRepository (a facade is a follow-up). `controllers ->
+# reviews` is the dev seed only.
+# Pruned in the same review because the moves removed them for good: `lootbox -> models`,
+# `lootbox -> repositories`, `models -> catalog|displays|identity|inventory|sites`,
+# `repositories -> identity|utils`, `services -> exceptions|identity`, `config -> models|repositories`,
+# `dtos -> services|validation`, `validation -> dtos`, `inventory -> repositories`.
+controllers -> reviews
+lootbox -> reviews
+reviews -> identity
+reviews -> shared

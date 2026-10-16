@@ -53,9 +53,8 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since AND sm.at < :until")
     List<StockMovement> findByReasonAndAtBetweenWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since, @Param("until") OffsetDateTime until);
 
-    // Find all movements for a specific audit log
-    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId ORDER BY sm.id")
-    List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId);
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId AND sm.site.id = :siteId ORDER BY sm.id")
+    List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId, @Param("siteId") java.util.UUID siteId);
 
     // Find stock movements by metadata source (used for dev seed cleanup)
     @Query(value = "SELECT * FROM stock_movements WHERE metadata->>'source' = :source", nativeQuery = true)

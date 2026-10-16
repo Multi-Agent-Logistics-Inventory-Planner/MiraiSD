@@ -1636,166 +1636,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/notifications": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getAllNotifications"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/counts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getNotificationCounts"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/read-all": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["markAllAsRead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["searchNotifications"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/unread": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getUnreadNotifications"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["getNotificationById"];
-        put?: never;
-        post?: never;
-        delete: operations["deleteNotification"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/mark-read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["markAsUserRead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["markAsRead"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/resolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["resolveNotification"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/notifications/{id}/unresolve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["unresolveNotification"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/products": {
         parameters: {
             query?: never;
@@ -2796,6 +2636,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getMySites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/audit-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSiteAuditLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/audit-logs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteAuditLogDetail"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3997,6 +3869,118 @@ export interface paths {
         };
         get?: never;
         put: operations["updateSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteMonthlySummaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/users/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteUsersForReviewManagement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/users/tracked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteReviewTrackedUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteUserForReviewTracking"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/users/{userId}/reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteUserReviews"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/users/{userId}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getSiteUserReviewStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sites/{siteId}/reviews/users/{userId}/tracking": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["updateSiteUserReviewTracking"];
         post?: never;
         delete?: never;
         options?: never;
@@ -5376,34 +5360,6 @@ export interface components {
             /** Format: uuid */
             sourceLocationId?: string;
         };
-        NotificationResponseDTO: {
-            /** Format: date-time */
-            createdAt?: string;
-            /** Format: date-time */
-            deliveredAt?: string;
-            /** Format: uuid */
-            id?: string;
-            /** Format: uuid */
-            inventoryId?: string;
-            /** Format: uuid */
-            itemId?: string;
-            itemName?: string;
-            message?: string;
-            metadata?: {
-                [key: string]: Record<string, never>;
-            };
-            /** Format: date-time */
-            readAt?: string;
-            /** Format: uuid */
-            recipientId?: string;
-            /** Format: date-time */
-            resolvedAt?: string;
-            /** @enum {string} */
-            severity?: "INFO" | "WARNING" | "CRITICAL";
-            /** @enum {string} */
-            type?: "LOW_STOCK" | "OUT_OF_STOCK" | "REORDER_SUGGESTION" | "EXPIRY_WARNING" | "SYSTEM_ALERT" | "SHIPMENT_COMPLETED" | "SHIPMENT_DAMAGED" | "SHIPMENT_DELIVERY_FAILED" | "PACKAGE_ARRIVED" | "DISPLAY_STALE" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "DISPLAY_RENEWED" | "KUJI_PRIZE_DRAWN" | "KUJI_PRIZE_DRAW_UNDONE";
-            via?: string[];
-        };
         OpenKujiBoxRequestDTO: {
             /** Format: uuid */
             actorId: string;
@@ -5491,24 +5447,6 @@ export interface components {
         };
         PageMachineDisplayDTO: {
             content?: components["schemas"]["MachineDisplayDTO"][];
-            empty?: boolean;
-            first?: boolean;
-            last?: boolean;
-            /** Format: int32 */
-            number?: number;
-            /** Format: int32 */
-            numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
-            /** Format: int32 */
-            size?: number;
-            sort?: components["schemas"]["SortObject"];
-            /** Format: int64 */
-            totalElements?: number;
-            /** Format: int32 */
-            totalPages?: number;
-        };
-        PageNotificationResponseDTO: {
-            content?: components["schemas"]["NotificationResponseDTO"][];
             empty?: boolean;
             first?: boolean;
             last?: boolean;
@@ -5921,6 +5859,21 @@ export interface components {
             /** Format: uuid */
             userId?: string;
             userName?: string;
+        };
+        ReviewUserDTO: {
+            canonicalName?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            email?: string;
+            fullName?: string;
+            /** Format: uuid */
+            id?: string;
+            isReviewTracked?: boolean;
+            nameVariants?: string[];
+            /** @enum {string} */
+            role?: "ADMIN" | "ASSISTANT_MANAGER" | "EMPLOYEE";
+            /** Format: date-time */
+            updatedAt?: string;
         };
         RiskSummary: {
             /** Format: int32 */
@@ -12241,534 +12194,6 @@ export interface operations {
             };
         };
     };
-    getAllNotifications: {
-        parameters: {
-            query: {
-                recipientId?: string;
-                pageable: components["schemas"]["Pageable"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageNotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getNotificationCounts: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: number;
-                    };
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markAllAsRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    searchNotifications: {
-        parameters: {
-            query: {
-                search?: string;
-                type?: "LOW_STOCK" | "OUT_OF_STOCK" | "REORDER_SUGGESTION" | "EXPIRY_WARNING" | "SYSTEM_ALERT" | "SHIPMENT_COMPLETED" | "SHIPMENT_DAMAGED" | "SHIPMENT_DELIVERY_FAILED" | "PACKAGE_ARRIVED" | "DISPLAY_STALE" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "DISPLAY_RENEWED" | "KUJI_PRIZE_DRAWN" | "KUJI_PRIZE_DRAW_UNDONE";
-                resolved?: boolean;
-                fromDate?: string;
-                toDate?: string;
-                pageable: components["schemas"]["Pageable"];
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["PageNotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getUnreadNotifications: {
-        parameters: {
-            query: {
-                recipientId: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"][];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    getNotificationById: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    deleteNotification: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markAsUserRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    markAsRead: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    resolveNotification: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
-    unresolveNotification: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": components["schemas"]["NotificationResponseDTO"];
-                };
-            };
-            /** @description Authentication required */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-            /** @description Insufficient permissions */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error?: unknown;
-                        message?: unknown;
-                        status?: unknown;
-                    };
-                };
-            };
-        };
-    };
     getAllProducts: {
         parameters: {
             query?: {
@@ -13324,7 +12749,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"][];
+                    "*/*": components["schemas"]["ReviewUserDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -13370,7 +12795,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"][];
+                    "*/*": components["schemas"]["ReviewUserDTO"][];
                 };
             };
             /** @description Authentication required */
@@ -13418,7 +12843,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
+                    "*/*": components["schemas"]["ReviewUserDTO"];
                 };
             };
             /** @description Authentication required */
@@ -13470,7 +12895,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponseDTO"];
+                    "*/*": components["schemas"]["ReviewUserDTO"];
                 };
             };
             /** @description Authentication required */
@@ -16828,6 +16253,114 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SiteMembershipDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    listSiteAuditLogs: {
+        parameters: {
+            query?: {
+                page?: number;
+                size?: number;
+                search?: string;
+                actorId?: string;
+                reason?: "INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED";
+                reasons?: ("INITIAL_STOCK" | "RESTOCK" | "SHIPMENT_RECEIPT" | "SHIPMENT_RECEIPT_REVERSED" | "SHIPMENT_PARTIAL_RECEIPT" | "SHIPMENT_EDITED" | "SHIPMENT_DELETED" | "SHIPMENT_STATUS_OVERRIDDEN" | "SALE" | "DAMAGE" | "ADJUSTMENT" | "RETURN" | "TRANSFER" | "REMOVED" | "DISPLAY_SET" | "DISPLAY_REMOVED" | "DISPLAY_SWAP" | "KUJI_PRIZE_WON" | "KUJI_DRAW_REVERSED" | "KUJI_SLIP_ADJUSTMENT" | "COIN_RATE_CHANGED")[];
+                fromDate?: string;
+                toDate?: string;
+                productId?: string;
+                locationId?: string;
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageAuditLogDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteAuditLogDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuditLogDetailDTO"];
                 };
             };
             /** @description Authentication required */
@@ -21078,6 +20611,361 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SiteProductResponse"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteMonthlySummaries: {
+        parameters: {
+            query: {
+                year: number;
+                month: number;
+            };
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReviewSummaryResponseDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteUsersForReviewManagement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReviewUserDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteReviewTrackedUsers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReviewUserDTO"][];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteUserForReviewTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReviewUserDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteUserReviews: {
+        parameters: {
+            query?: {
+                fromDate?: string;
+                toDate?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path: {
+                siteId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageReviewResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    getSiteUserReviewStats: {
+        parameters: {
+            query?: {
+                year?: number;
+                month?: number;
+            };
+            header?: never;
+            path: {
+                siteId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserReviewStatsResponseDTO"];
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error?: unknown;
+                        message?: unknown;
+                        status?: unknown;
+                    };
+                };
+            };
+        };
+    };
+    updateSiteUserReviewTracking: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                siteId: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UserReviewTrackingRequestDTO"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReviewUserDTO"];
                 };
             };
             /** @description Authentication required */

@@ -5,7 +5,7 @@ import com.mirai.inventoryservice.displays.api.RenewDisplayRequestDTO;
 import com.mirai.inventoryservice.displays.api.SetMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
@@ -23,7 +23,7 @@ import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.inventory.domain.InvalidInventoryOperationException;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.application.UserService;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,7 +94,7 @@ class MachineDisplayServiceNotificationTest {
         sameSiteTargetMachineId = UUID.randomUUID();
 
         // Audit log creation always succeeds with a stub
-        when(auditLogService.createAuditLog(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
+        when(auditLogService.createAuditLog(any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
                 .thenReturn(AuditLog.builder().id(UUID.randomUUID()).build());
 
         // Location lookups return a placeholder, with enough of a storageLocation/site chain
@@ -193,6 +193,27 @@ class MachineDisplayServiceNotificationTest {
         assertEquals("R2", machines.get(0).get("code"));
         assertEquals(List.of("Sonny V1"), machines.get(0).get("previously"));
         assertEquals(List.of("Sonny V1", "Sonny V3"), machines.get(0).get("currently"));
+    }
+
+    @Test
+    void setDisplay_stampsTheMachinesSiteOnTheNotification() {
+        Product newProduct = product("Sonny V3");
+
+        when(machineDisplayRepository.findActiveByLocationTypeAndMachineId(LocationType.SINGLE_CLAW_MACHINE, machineId))
+                .thenReturn(List.of());
+        when(catalogQueries.findById(newProduct.getId())).thenReturn(Optional.of(ProductRef.from(newProduct)));
+        when(machineDisplayRepository.save(any(MachineDisplay.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        service.setDisplay(SetMachineDisplayRequestDTO.builder()
+                .locationType(LocationType.SINGLE_CLAW_MACHINE)
+                .machineId(machineId)
+                .productId(newProduct.getId())
+                .actorId(actorId)
+                .build());
+
+        ArgumentCaptor<Notification> captor = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationService).createNotification(captor.capture());
+        assertEquals(loc.getStorageLocation().getSite().getId(), captor.getValue().getSiteId());
     }
 
     @Test
@@ -313,7 +334,7 @@ class MachineDisplayServiceNotificationTest {
         verify(machineDisplayRepository, never()).saveAll(any());
         verify(machineDisplayRepository, never()).save(any());
         verify(auditLogService, never()).createAuditLog(
-                any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any());
         verify(inventoryOperations, never()).saveMovements(any());
         verify(notificationService, never()).createNotification(any());
     }
@@ -388,7 +409,7 @@ class MachineDisplayServiceNotificationTest {
         // The display was still saved and the audit was still written.
         verify(machineDisplayRepository).save(any(MachineDisplay.class));
         verify(auditLogService).createAuditLog(
-                any(), eq(StockMovementReason.DISPLAY_SET),
+                any(), any(), eq(StockMovementReason.DISPLAY_SET),
                 any(), any(), any(), any(),
                 anyInt(), anyInt(), any(), any());
     }

@@ -4,7 +4,7 @@ import com.mirai.inventoryservice.displays.api.BatchClearDisplaysRequestDTO;
 import com.mirai.inventoryservice.displays.api.BatchDisplaySwapRequestDTO;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.sites.domain.Location;
@@ -17,7 +17,7 @@ import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.identity.application.UserService;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,7 +79,7 @@ class MachineDisplayServiceBatchQueryGuardTest {
         actorId = UUID.randomUUID();
         machineId = UUID.randomUUID();
 
-        when(auditLogService.createAuditLog(any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
+        when(auditLogService.createAuditLog(any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt(), any(), any()))
                 .thenReturn(AuditLog.builder().id(UUID.randomUUID()).build());
 
         Site site = Site.builder().id(UUID.randomUUID()).code("MAIN").name("Main").build();

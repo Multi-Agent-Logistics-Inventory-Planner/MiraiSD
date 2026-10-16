@@ -5,7 +5,7 @@ import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.exceptions.InvalidShipmentStatusException;
 import com.mirai.inventoryservice.models.enums.ShipmentStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
 import com.mirai.inventoryservice.shipments.domain.Shipment;
@@ -89,12 +89,13 @@ class ShipmentServiceOverrideTest {
 
         assertEquals(ShipmentStatus.RECEIVED, result.getStatus());
         verify(auditLogService).createShipmentEvent(
-                eq(actor), eq("Bob"), eq(StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN),
+                any(), eq(actor), eq("Bob"), eq(StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN),
                 eq(shipmentId), eq("SHIP-1"), eq(1),
                 isNull(),
                 eq("PENDING"),
                 eq("RECEIVED"),
                 eq("missing tracking, items received"));
+        verify(broadcastService).broadcastAuditLogCreated(siteId, null);
         // The legacy createAuditLog path is no longer called for overrides.
         verify(auditLogService, never()).createAuditLog(any(), any(), any(), any(), any(), any(), any(),
                 anyInt(), anyInt(), any(), any());
@@ -106,7 +107,7 @@ class ShipmentServiceOverrideTest {
         service.overrideShipmentStatus(
                 siteId, shipmentId, ShipmentStatus.RECEIVED, "  padded reason  ", null, null);
         verify(auditLogService).createShipmentEvent(
-                any(), any(), eq(StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN),
+                any(), any(), any(), eq(StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN),
                 any(), any(), anyInt(), any(), any(), any(),
                 eq("padded reason"));
     }
@@ -118,7 +119,7 @@ class ShipmentServiceOverrideTest {
                 service.overrideShipmentStatus(
                         siteId, shipmentId, ShipmentStatus.CANCELLED, "trying to cancel", null, null));
         verify(shipmentRepository, never()).save(any());
-        verify(auditLogService, never()).createShipmentEvent(any(), any(), any(), any(), any(),
+        verify(auditLogService, never()).createShipmentEvent(any(), any(), any(), any(), any(), any(),
                 anyInt(), any(), any(), any(), any());
     }
 
@@ -138,7 +139,7 @@ class ShipmentServiceOverrideTest {
         service.overrideShipmentStatus(
                 siteId, shipmentId, ShipmentStatus.RECEIVED, "no change", null, null);
         verify(shipmentRepository, never()).save(any());
-        verify(auditLogService, never()).createShipmentEvent(any(), any(), any(), any(), any(),
+        verify(auditLogService, never()).createShipmentEvent(any(), any(), any(), any(), any(), any(),
                 anyInt(), any(), any(), any(), any());
     }
 

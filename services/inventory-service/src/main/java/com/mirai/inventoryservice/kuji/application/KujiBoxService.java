@@ -28,7 +28,7 @@ import com.mirai.inventoryservice.catalog.domain.ProductNotFoundException;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.displays.application.DisplayOperations;
 import com.mirai.inventoryservice.catalog.domain.Product;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
@@ -46,7 +46,7 @@ import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxRepository;
 import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxTierRepository;
 import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.identity.application.UserService;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
 import jakarta.persistence.EntityManager;
@@ -723,6 +723,7 @@ public class KujiBoxService {
         Product parentProduct = box.getProduct();
         String drawSummary = formatDrawSummary(request.getDraws(), tiersById);
         AuditLog parentLog = createAuditLog(
+                siteId,
                 request.getActorId(),
                 StockMovementReason.KUJI_PRIZE_WON,
                 box.getLocation().getId(),
@@ -818,7 +819,7 @@ public class KujiBoxService {
     public KujiBoxResponseDTO undoDraw(UUID siteId, UUID boxId, UUID auditLogId, UUID actorId) {
         KujiBox box = requireBoxInSite(siteId, boxId);
 
-        AuditLog target = auditLogService.findById(auditLogId)
+        AuditLog target = auditLogService.findById(siteId, auditLogId)
                 .orElseThrow(() -> new IllegalArgumentException("AuditLog not found: " + auditLogId));
         if (target.getReason() != StockMovementReason.KUJI_PRIZE_WON) {
             throw new IllegalArgumentException(
@@ -831,7 +832,7 @@ public class KujiBoxService {
             throw new IllegalStateException("Draw already undone");
         }
 
-        List<StockMovement> originals = inventoryQueries.findByAuditLogIdWithItem(auditLogId);
+        List<StockMovement> originals = inventoryQueries.findByAuditLogIdWithItem(auditLogId, siteId);
         if (originals == null || originals.isEmpty()) {
             throw new IllegalArgumentException(
                     "No stock movements found for audit log: " + auditLogId);
@@ -855,6 +856,7 @@ public class KujiBoxService {
         Product parentProduct = box.getProduct();
         String undoSummary = formatUndoSummary(originals);
         AuditLog reverseLog = createAuditLog(
+                siteId,
                 actorId,
                 StockMovementReason.KUJI_DRAW_REVERSED,
                 null,
@@ -1033,6 +1035,7 @@ public class KujiBoxService {
         // event is needed (and none is consumed downstream for KUJI_SLIP_ADJUSTMENT).
         String bucketLabel = inactive ? " (inactive)" : "";
         createAuditLog(
+                siteId,
                 request.getActorId(),
                 StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                 box.getLocation().getId(),
@@ -1100,6 +1103,7 @@ public class KujiBoxService {
         Product parentProduct = box.getProduct();
         String action = direction == MoveSlipsRequestDTO.Direction.ACTIVATE ? "activate" : "deactivate";
         createAuditLog(
+                siteId,
                 request.getActorId(),
                 StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                 box.getLocation().getId(),
@@ -1151,6 +1155,7 @@ public class KujiBoxService {
         String summary = "Kuji prize tier deleted: " + tierHeader
                 + " (active " + active + ", inactive " + inactive + ")";
         createAuditLog(
+                siteId,
                 request.getActorId(),
                 StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                 box.getLocation().getId(),
@@ -1298,6 +1303,7 @@ public class KujiBoxService {
         productStockStateWriter.applyStockState(child.getId(), prev + quantity, true);
 
         AuditLog auditLog = createAuditLog(
+                box.getSiteId(),
                 actorId,
                 StockMovementReason.ADJUSTMENT,
                 null,
@@ -1454,6 +1460,7 @@ public class KujiBoxService {
         String summary = "Kuji prize tier added: " + tierAuditHeader(tier)
                 + " (active " + slipCount + ", inactive " + heldBack + ")";
         createAuditLog(
+                siteId,
                 request.getActorId(),
                 StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                 box.getLocation().getId(),
@@ -1623,6 +1630,7 @@ public class KujiBoxService {
             // entry and split the change-list into the expandable detail body.
             String summary = "Kuji tier edited: " + tierAuditHeader(tier) + " — " + String.join(", ", changes);
             AuditLog auditLog = createAuditLog(
+                    siteId,
                     request.getActorId(),
                     StockMovementReason.KUJI_SLIP_ADJUSTMENT,
                     box.getLocation().getId(),
@@ -1855,6 +1863,7 @@ public class KujiBoxService {
         int newSourceQty = sourcePrev - quantity;
 
         AuditLog auditLog = createAuditLog(
+                siteId,
                 actorId,
                 StockMovementReason.SALE,
                 sourceLocation.getId(),
@@ -1931,6 +1940,7 @@ public class KujiBoxService {
         inventoryOperations.saveInventory(destination);
 
         AuditLog auditLog = createAuditLog(
+                destinationLocation.getStorageLocation().getSite().getId(),
                 actorId,
                 StockMovementReason.TRANSFER,
                 null,
@@ -2018,6 +2028,7 @@ public class KujiBoxService {
         int destPrev = destination.getQuantity();
 
         AuditLog auditLog = createAuditLog(
+                destinationLocation.getStorageLocation().getSite().getId(),
                 actorId,
                 reason,
                 sourceLocation.getId(),
@@ -2090,6 +2101,7 @@ public class KujiBoxService {
     }
 
     private AuditLog createAuditLog(
+            UUID siteId,
             UUID actorId,
             StockMovementReason reason,
             UUID fromLocationId,
@@ -2110,6 +2122,7 @@ public class KujiBoxService {
         }
 
         AuditLog auditLog = AuditLog.builder()
+                .siteId(siteId)
                 .user(user)
                 .actorName(actorName)
                 .reason(reason)
@@ -2343,6 +2356,7 @@ public class KujiBoxService {
                     .severity(NotificationSeverity.INFO)
                     .message(message)
                     .itemId(parentProduct.getId())
+                    .siteId(box.getSiteId())
                     .metadata(metadata)
                     .via(List.of("slack"))
                     .build();

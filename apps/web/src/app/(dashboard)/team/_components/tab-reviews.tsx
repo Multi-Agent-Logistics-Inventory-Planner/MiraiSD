@@ -18,7 +18,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { getReviewSummaries } from "@/lib/api/reviews";
+import { getSiteReviewSummaries } from "@/lib/api/site-reviews";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 import { ReviewSummary } from "@/types/api";
 import { usePermissions } from "@/hooks/use-permissions";
 import { Permission } from "@/lib/rbac";
@@ -188,17 +189,23 @@ export function TabReviews() {
     setIsStatsDialogOpen(true);
   }, []);
 
+  const { siteId, isLoading: isSiteLoading } = useCurrentSite();
+
   const fetchData = useCallback(async () => {
+    if (!siteId) {
+      if (!isSiteLoading) setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
-      const data = await getReviewSummaries(selectedYear, selectedMonth);
+      const data = await getSiteReviewSummaries(siteId, selectedYear, selectedMonth);
       setSummaries(data);
     } catch {
       // Error handled silently
     } finally {
       setIsLoading(false);
     }
-  }, [selectedYear, selectedMonth]);
+  }, [siteId, isSiteLoading, selectedYear, selectedMonth]);
 
   useEffect(() => {
     fetchData();

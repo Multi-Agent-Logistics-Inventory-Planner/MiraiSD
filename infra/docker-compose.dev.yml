@@ -1,5 +1,5 @@
 # Local Development Stack - Self-contained, no Supabase needed
-# Usage: docker-compose -f docker-compose.dev.yml up -d
+# Usage: scripts/dev-up.sh  (brings the stack up and seeds it; plain "docker compose up" does not seed)
 
 # After inventory-service finishes startup, apply local Phase 6 SQL additions:
 # python3 scripts/setup_dev_db.py  (from repository root)

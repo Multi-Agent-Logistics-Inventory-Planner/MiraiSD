@@ -15,6 +15,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuditLogFilterDTO {
+    /** Set by the service from the authorized site, never bound from request parameters. */
+    private UUID siteId;
     private String search;
     private UUID actorId;
     private StockMovementReason reason;

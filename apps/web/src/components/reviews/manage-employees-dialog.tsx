@@ -22,9 +22,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  getAllUsersForReviewManagement,
-  updateUserReviewTracking,
-} from "@/lib/api/reviews";
+  getSiteAllUsersForReviewManagement,
+  updateSiteUserReviewTracking,
+} from "@/lib/api/site-reviews";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 import { User } from "@/types/api";
 
 const ITEMS_PER_PAGE = 5;
@@ -116,6 +117,7 @@ function EditUserModal({
   const [canonicalName, setCanonicalName] = useState("");
   const [aliases, setAliases] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const { siteId } = useCurrentSite();
 
   useEffect(() => {
     if (user) {
@@ -126,11 +128,11 @@ function EditUserModal({
   }, [user]);
 
   const handleSave = async () => {
-    if (!user || !canonicalName.trim()) return;
+    if (!user || !siteId || !canonicalName.trim()) return;
 
     setIsSaving(true);
     try {
-      await updateUserReviewTracking(user.id, {
+      await updateSiteUserReviewTracking(siteId, user.id, {
         canonicalName: canonicalName.trim(),
         nameVariants: aliases,
       });
@@ -209,6 +211,8 @@ export function ManageEmployeesDialog({
   onOpenChange,
   onSuccess,
 }: ManageEmployeesDialogProps) {
+  const { siteId, isLoading: isSiteLoading } = useCurrentSite();
+  const siteUnavailable = !siteId && !isSiteLoading;
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
@@ -220,9 +224,10 @@ export function ManageEmployeesDialog({
   const paginatedUsers = users.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const fetchUsers = async () => {
+    if (!siteId) return;
     setIsLoading(true);
     try {
-      const data = await getAllUsersForReviewManagement();
+      const data = await getSiteAllUsersForReviewManagement(siteId);
       // Sort by tracked status (tracked first) then by name
       const sorted = data.sort((a, b) => {
         if (a.isReviewTracked === b.isReviewTracked) {
@@ -239,16 +244,17 @@ export function ManageEmployeesDialog({
   };
 
   useEffect(() => {
-    if (open) {
+    if (open && siteId) {
       fetchUsers();
       setCurrentPage(1);
     }
-  }, [open]);
+  }, [open, siteId]);
 
   const handleToggleTracking = async (user: User) => {
+    if (!siteId) return;
     setTogglingUserId(user.id);
     try {
-      await updateUserReviewTracking(user.id, {
+      await updateSiteUserReviewTracking(siteId, user.id, {
         isReviewTracked: !user.isReviewTracked,
       });
       fetchUsers();
@@ -284,7 +290,11 @@ export function ManageEmployeesDialog({
             </div>
 
             {/* User Table */}
-            {isLoading ? (
+            {siteUnavailable ? (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No site available for your account</p>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>

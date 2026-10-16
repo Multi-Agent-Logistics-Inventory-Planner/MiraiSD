@@ -147,7 +147,7 @@ class InventoryOperationsTest {
     @Test
     void recordMovement_fieldForm_savesAndPublishesOutbox() {
         UUID auditLogId = UUID.randomUUID();
-        var auditLog = com.mirai.inventoryservice.models.audit.AuditLog.builder().id(auditLogId).build();
+        var auditLog = com.mirai.inventoryservice.audit.domain.AuditLog.builder().id(auditLogId).build();
         Map<String, Object> metadata = Map.of("k", "v");
 
         StockMovement saved = inventoryOperations.recordMovement(
