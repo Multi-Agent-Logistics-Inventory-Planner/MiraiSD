@@ -1,7 +1,4 @@
--- Verify step (.specs/phase-7-shipments T-3, matching V62's precedent exactly): supports the
--- site-scoped list/lookup reads T-4/T-5 add (ShipmentRepository site-scoped finders, the v1
--- /api/v1/sites/{siteId}/shipments routes). CONCURRENTLY + the paired .conf disabling the
--- wrapping transaction, since shipments is in daily production use and must not be locked.
+-- Run outside a transaction (paired .conf): CONCURRENTLY avoids locking a live table.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_shipments_site_status
   ON shipments(site_id, status);
 
