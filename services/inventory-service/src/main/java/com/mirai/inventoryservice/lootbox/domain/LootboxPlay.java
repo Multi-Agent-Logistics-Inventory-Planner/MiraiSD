@@ -101,7 +101,7 @@ public class LootboxPlay {
      * NOT NULL as of V79 - {@link #lootbox} also becomes NOT NULL in that migration, since the
      * 2026-09-27 pre-flight check found zero existing plays with a null lootbox_id.
      */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @CreationTimestamp

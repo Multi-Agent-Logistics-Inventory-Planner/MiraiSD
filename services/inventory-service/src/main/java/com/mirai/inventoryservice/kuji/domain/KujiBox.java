@@ -64,7 +64,7 @@ public class KujiBox {
      * resolve this from the authorized site context, never a default, and it must always match
      * {@link #location}'s site (enforced in the database by the V78 consistency trigger).
      */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @Column(length = 120)

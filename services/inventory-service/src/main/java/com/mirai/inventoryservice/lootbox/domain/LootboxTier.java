@@ -39,7 +39,7 @@ public class LootboxTier {
     private UUID lootboxId;
 
     /** Inherited from {@link #lootbox}'s site (.specs/phase-7-kuji-lootbox T-2). */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @NotBlank

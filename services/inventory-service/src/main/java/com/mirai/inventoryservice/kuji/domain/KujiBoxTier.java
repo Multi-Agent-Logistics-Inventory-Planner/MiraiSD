@@ -59,7 +59,7 @@ public class KujiBoxTier {
     private UUID linkedProductId;
 
     /** Inherited from {@link #box}'s site (.specs/phase-7-kuji-lootbox T-2); see KujiBox.siteId. */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     /** Slips currently winnable / on a slip in the box. */

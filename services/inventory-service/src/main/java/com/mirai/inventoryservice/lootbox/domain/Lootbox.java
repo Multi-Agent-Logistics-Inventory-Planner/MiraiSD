@@ -53,7 +53,7 @@ public class Lootbox {
     private Boolean active = true;
 
     /** Forward-compat hedge; not yet wired to any FK or query. */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @NotNull

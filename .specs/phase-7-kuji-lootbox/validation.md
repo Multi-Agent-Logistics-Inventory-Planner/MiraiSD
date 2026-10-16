@@ -12,7 +12,7 @@ Backend (`services/inventory-service`), after applying the review fixes in `revi
 
 ## Result
 
-Backend: compile clean. `1169` tests, `0` failures, `0` errors — the full suite, every class,
+Backend: compile clean. `1169` tests, `0` failures, `0` errors at the time of the review-fix round (superseded by the post-merge run below) — the full suite, every class,
 in one combined run (`-Dtest='*'` pulls in both unit and integration tests, unlike a bare
 `./mvnw test` — see the standing project note in `.specs/phase-7-kuji-lootbox/log.md` about
 `*IT.java` coverage). This includes `CatalogEntityAccessCallerSetTest` and `ArchitectureTest`,
@@ -53,3 +53,33 @@ under their shifted synthetic names), not new production behavior to cover.
   existing `Site*SecurityTest` suites). PostgreSQL/migration tests pass
   (`KujiLootboxSiteMigrationIT`). `ArchitectureTest` and `CatalogEntityAccessCallerSetTest` now
   both pass. The full suite (1169 tests) is green in one combined run.
+
+## Post-merge verification (2026-10-15)
+
+Commands, run from `services/inventory-service` unless noted:
+
+```
+./mvnw -o test -Dtest='*'
+npx tsc --noEmit && npx vitest run          # apps/web
+.venv/bin/python -m pytest -q               # services/messaging-service, services/forecasting-service
+python -m pytest -q tests/contracts         # using the forecasting-service venv
+```
+
+Result: backend `1171` tests, `0` failures, `0` errors (1169 plus `KujiBoxTierSiteIT`'s 2).
+Web typecheck clean, `468/468` vitest. messaging-service `78`, forecasting-service `355`,
+`tests/contracts` `31`, all passing.
+
+Local database check (hand-applied V69-V80 over the anonymized production slice described in
+`log.md`): no NULL `site_id` on any kuji, lootbox or coin table, row counts preserved, no invalid
+indexes, 4 composite FKs, `trg_kuji_boxes_site_consistency` and
+`uniq_kuji_boxes_open_per_site_product` present, `uniq_kuji_boxes_open_per_product` absent.
+
+Gaps, stated plainly:
+
+- `tests/e2e` did not run (forecasting healthcheck uses `curl`, absent from the image; pre-existing).
+- Web lint did not run (no ESLint flat config in `apps/web`).
+- The UI write-path sweep, the messaging-service review-count write under the constrained schema,
+  and V76/V78 against a full production dump have not been run.
+
+AC impact: AC-1 and AC-2 are strengthened (tier site ownership was missing on two live write
+paths, now fixed and enforced by the test schema). AC-6 evidence is the 1171-test run above.

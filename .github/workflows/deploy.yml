@@ -209,6 +209,7 @@ jobs:
     if: needs.build-push-inventory-service.result == 'success'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: image
@@ -216,6 +217,7 @@ jobs:
           severity: CRITICAL
           ignore-unfixed: true
           exit-code: '1'
+          trivyignores: .trivyignore
         env:
           # Trivy's remote-registry client is separate from `docker login` —
           # it does not read the runner's Docker credential store, so it

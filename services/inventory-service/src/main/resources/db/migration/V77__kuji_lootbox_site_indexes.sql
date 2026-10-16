@@ -1,13 +1,5 @@
--- Verify step (.specs/phase-7-kuji-lootbox T-2/T-3, matching V62/V71/V74's precedent exactly).
--- CONCURRENTLY + the paired .conf disabling the wrapping transaction, since these tables are in
--- daily production use and must not be locked.
---
--- The unique indexes below are not just read-path optimizations: V78/V79 reference them via
--- "ADD CONSTRAINT ... UNIQUE USING INDEX" (a fast, metadata-only operation) to become the target
--- of each child table's composite (parent_id, site_id) same-site foreign key, so the FK itself
--- can be added without a second full-table scan or lock. Creating them CONCURRENTLY here means
--- V78/V79 only do cheap constraint attachment, not concurrent index builds, during their gated
--- window.
+-- Run outside a transaction (paired .conf): CONCURRENTLY avoids locking live tables.
+-- The (id, site_id) unique indexes are the targets of V78/V79's composite same-site foreign keys.
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_kuji_boxes_site_status
   ON kuji_boxes(site_id, status);
 
@@ -38,8 +30,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_lootbox_plays_site_user_played
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_lootbox_plays_site_status_played
   ON lootbox_plays(site_id, status, played_at DESC);
 
--- Site-scoped idempotency: replaces the plain (user_id, idempotency_key) uniqueness once V79
--- drops it, so a replayed key at a different site never returns another site's play.
+-- Replaces the (user_id, idempotency_key) uniqueness that V79 drops.
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uniq_lootbox_plays_site_user_idem
   ON lootbox_plays(site_id, user_id, idempotency_key)
   WHERE idempotency_key IS NOT NULL;
@@ -50,9 +41,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_coin_adjustments_site_user_expires
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_coin_adjustments_site_created
   ON coin_adjustments(site_id, created_at DESC);
 
--- Site-scoped uniqueness for review_daily_counts, replacing uq_review_daily_counts_user_date
--- (V79 drops it) once a second site's reviews are ingested. NULL site rows cannot exist by the
--- time V79 runs (V76 backfills every row to MAIN), so no partial-index carve-out is needed here.
+-- Replaces uq_review_daily_counts_user_date, which V79 drops.
 CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS uniq_review_daily_counts_site_user_date
   ON review_daily_counts(site_id, user_id, date);
 

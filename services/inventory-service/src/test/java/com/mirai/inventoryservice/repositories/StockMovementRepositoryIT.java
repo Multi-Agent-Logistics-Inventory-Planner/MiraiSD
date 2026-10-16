@@ -135,12 +135,14 @@ class StockMovementRepositoryIT extends BaseKafkaIntegrationTest {
         KujiBox box = kujiBoxRepository.save(KujiBox.builder()
                 .product(parent)
                 .location(location)
+                .siteId(site.getId())
                 .status(KujiBoxStatus.OPEN)
                 .openedAt(OffsetDateTime.now().minusDays(1))
                 .build());
 
         KujiBoxTier tier = kujiBoxTierRepository.save(KujiBoxTier.builder()
                 .box(box)
+                .siteId(site.getId())
                 .label("Tier A")
                 .activeCount(10)
                 .inactiveCount(0)

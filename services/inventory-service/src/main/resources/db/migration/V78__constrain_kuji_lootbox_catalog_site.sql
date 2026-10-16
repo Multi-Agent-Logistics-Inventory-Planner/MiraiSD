@@ -1,12 +1,5 @@
--- Human-gated post-deploy constraint (.specs/phase-7-kuji-lootbox T-2/T-3, matching V68's
--- precedent). Do not include V78 in an automatic Flyway target until V75/V76's expand/backfill
--- are verified, the kuji/lootbox module's site-aware writers are deployed, and an immediate
--- production check confirms none of these columns have NULLs.
---
--- Constrains the catalog side only (kuji_boxes, kuji_box_tiers, lootboxes, lootbox_tiers,
--- lootbox_prizes). The coin ledger (lootbox_plays, coin_adjustments, review_daily_counts) is
--- constrained separately in V79 because it also depends on the messaging-service redeploy and
--- because lootbox_plays' composite FK references lootboxes(id, site_id), which must exist first.
+-- Human-gated: apply only after V75/V76 are verified, site-aware writers are deployed, and no
+-- NULL site_id remains in these tables.
 
 ALTER TABLE kuji_boxes
     ADD CONSTRAINT fk_kuji_boxes_site FOREIGN KEY (site_id) REFERENCES sites(id);
@@ -33,10 +26,7 @@ ALTER TABLE lootbox_prizes
 ALTER TABLE lootbox_prizes
     ALTER COLUMN site_id SET NOT NULL;
 
--- Replace the plain parent FKs with same-site composite FKs, using the (id, site_id) unique
--- indexes V77 already built CONCURRENTLY. This closes the "prize repointed into another site's
--- crate via an unscoped tier_id update" gap identified in T-2 (LootboxAdminService.updatePrize) at
--- the database layer, on top of the application-level site check T-3 adds.
+-- Composite FKs stop a child row from pointing at a parent in another site.
 ALTER TABLE kuji_box_tiers DROP CONSTRAINT kuji_box_tiers_box_id_fkey;
 ALTER TABLE kuji_box_tiers
     ADD CONSTRAINT fk_kuji_box_tiers_box_site
@@ -52,14 +42,8 @@ ALTER TABLE lootbox_prizes
     ADD CONSTRAINT fk_lootbox_prizes_tier_site
         FOREIGN KEY (tier_id, site_id) REFERENCES lootbox_tiers(id, site_id) ON DELETE CASCADE;
 
--- kuji_boxes site-consistency trigger: validates (does not derive) that a box's site_id always
--- matches its location's site, and its machine display's site when one is attached. locations has
--- no site_id column of its own (see V67's comment), so a composite FK on location_id is not
--- possible - this trigger is the enforcement mechanism instead. It is defense in depth only:
--- application code (T-3) must still resolve the location through a site-scoped lookup before this
--- ever fires. machine_display.site_id is still nullable at this point (its own constrain step is
--- gated separately in .specs/phase-7-displays), so the display check is skipped when that column
--- is NULL rather than treated as a mismatch.
+-- locations has no site_id, so a composite FK is impossible; a trigger checks the box site.
+-- The display check is skipped while machine_display.site_id is still nullable.
 CREATE OR REPLACE FUNCTION check_kuji_box_site_consistency() RETURNS TRIGGER AS $$
 DECLARE
     location_site_id UUID;

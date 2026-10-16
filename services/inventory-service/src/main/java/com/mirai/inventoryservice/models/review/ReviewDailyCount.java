@@ -52,7 +52,7 @@ public class ReviewDailyCount {
      * server-side REVIEW_SITE_CODE config value, never from any payload. Uniqueness is
      * (site_id, user_id, date) as of V79, replacing the legacy (user_id, date) constraint.
      */
-    @Column(name = "site_id")
+    @Column(name = "site_id", nullable = false)
     private UUID siteId;
 
     @CreationTimestamp

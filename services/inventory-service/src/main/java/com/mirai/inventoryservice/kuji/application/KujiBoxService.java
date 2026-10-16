@@ -283,6 +283,7 @@ public class KujiBoxService {
 
             KujiBoxTier tier = KujiBoxTier.builder()
                     .box(box)
+                    .siteId(box.getSiteId())
                     .label(tierDto.getLabel())
                     .letter(tierDto.getLetter())
                     .linkedProduct(linkedProduct)
@@ -1380,6 +1381,7 @@ public class KujiBoxService {
 
         KujiBoxTier tier = KujiBoxTier.builder()
                 .box(box)
+                .siteId(box.getSiteId())
                 .label(request.getLabel())
                 .letter(request.getLetter())
                 .linkedProduct(linkedProduct)
