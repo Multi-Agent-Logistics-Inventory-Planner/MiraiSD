@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.inventory.api;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
 /**
  * Registers {@link LegacyInventoryDeprecationFilter} only for the legacy global inventory/
@@ -24,6 +25,8 @@ public class LegacyInventoryDeprecationConfig {
                 new FilterRegistrationBean<>(new LegacyInventoryDeprecationFilter());
         registration.addUrlPatterns("/api/inventory/*", "/api/stock-movements/*");
         registration.setName("legacyInventoryDeprecationFilter");
+        // Must run before the security chain so 401/403 rejections carry the headers.
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }
 
@@ -33,6 +36,8 @@ public class LegacyInventoryDeprecationConfig {
                 new FilterRegistrationBean<>(new LegacyLocationInventoryDeprecationFilter());
         registration.addUrlPatterns("/api/locations/*", "/api/storage-locations/*");
         registration.setName("legacyLocationInventoryDeprecationFilter");
+        // Must run before the security chain so 401/403 rejections carry the headers.
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }
 }

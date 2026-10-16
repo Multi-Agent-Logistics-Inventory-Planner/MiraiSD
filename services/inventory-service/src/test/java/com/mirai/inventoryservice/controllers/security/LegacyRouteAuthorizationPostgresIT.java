@@ -105,8 +105,8 @@ class LegacyRouteAuthorizationPostgresIT extends BasePostgresMockMvcIntegrationT
                         .contentType("application/json").content(body))
                 .andExpect(status().isCreated());
 
-        assertThat(stockMovementRepository.findTopByActorIdOrderByAtDesc(user.getId())).isPresent();
-        assertThat(stockMovementRepository.findTopByActorIdOrderByAtDesc(forgedActorId)).isEmpty();
+        assertThat(stockMovementRepository.findTopBySite_IdAndActorIdOrderByAtDesc(mainSite().getId(), user.getId())).isPresent();
+        assertThat(stockMovementRepository.findTopBySite_IdAndActorIdOrderByAtDesc(mainSite().getId(), forgedActorId)).isEmpty();
     }
 
     @Test

@@ -174,18 +174,26 @@ public class SupabaseBroadcastService {
     }
 
     /**
-     * Broadcast that a notification has been created.
-     * Call this after creating new notifications.
+     * Broadcast that a notification has been created, site-scoped.
+     *
+     * @param siteId the owning site, or null for a notification not yet migrated to carry one
      */
-    public void broadcastNotificationCreated() {
-        dispatchAfterCommit(self::dispatchNotificationCreated);
+    public void broadcastNotificationCreated(UUID siteId) {
+        dispatchAfterCommit(() -> self.dispatchNotificationCreated(siteId));
     }
 
     @Async
-    void dispatchNotificationCreated() {
+    void dispatchNotificationCreated(UUID siteId) {
+        broadcast(buildNotificationCreatedPayload(siteId));
+    }
+
+    ObjectNode buildNotificationCreatedPayload(UUID siteId) {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("type", "notification_created");
-        broadcast(payload);
+        if (siteId != null) {
+            payload.put("siteId", siteId.toString());
+        }
+        return payload;
     }
 
     /**

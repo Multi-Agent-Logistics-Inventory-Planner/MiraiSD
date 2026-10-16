@@ -16,7 +16,7 @@ import com.mirai.inventoryservice.inventory.domain.InsufficientInventoryExceptio
 import com.mirai.inventoryservice.inventory.domain.InventoryNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
@@ -30,7 +30,7 @@ import com.mirai.inventoryservice.kuji.infrastructure.KujiBoxTierRepository;
 import com.mirai.inventoryservice.sites.application.LocationService;
 import com.mirai.inventoryservice.displays.application.DisplayOperations;
 import com.mirai.inventoryservice.identity.application.UserService;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
 import jakarta.persistence.EntityManager;
@@ -149,6 +149,7 @@ class KujiBoxServiceTest {
 
         box = KujiBox.builder()
                 .id(boxId)
+                .siteId(siteId)
                 .product(parent)
                 .location(boxLocation)
                 .status(KujiBoxStatus.OPEN)
@@ -301,6 +302,19 @@ class KujiBoxServiceTest {
     // ===================== Perf-optimization regression guards =====================
 
     @Test
+    void addSlip_stampsTheBoxSiteOnTheAuditLog() {
+        AddSlipRequestDTO req = new AddSlipRequestDTO();
+        req.setActorId(actorId);
+        req.setQuantity(1);
+
+        service.addSlip(siteId, boxId, tierId, req);
+
+        ArgumentCaptor<AuditLog> auditCaptor = ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogService).save(auditCaptor.capture());
+        assertEquals(siteId, auditCaptor.getValue().getSiteId());
+    }
+
+    @Test
     void addSlip_writesAuditLogOnlyAndNoStockMovementOrOutbox() {
         // Slip adjustments don't change inventory; the row used to be a no-op
         // StockMovement (qty=0) plus an outbox event. Both were dropped.
@@ -435,6 +449,11 @@ class KujiBoxServiceTest {
         assertEquals(3, tier.getDrawnCount(),
                 "drawnCount must increment by drawn quantity");
 
+        org.mockito.ArgumentCaptor<com.mirai.inventoryservice.models.audit.Notification> notif =
+                org.mockito.ArgumentCaptor.forClass(com.mirai.inventoryservice.models.audit.Notification.class);
+        verify(notificationService).createNotification(notif.capture());
+        assertEquals(siteId, notif.getValue().getSiteId());
+
         // Review finding P2 regression: the audit broadcast must carry this box's real site.
         verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
     }
@@ -450,7 +469,7 @@ class KujiBoxServiceTest {
                 .id(auditLogId)
                 .reason(StockMovementReason.KUJI_PRIZE_WON)
                 .build();
-        when(auditLogService.findById(auditLogId)).thenReturn(Optional.of(drawLog));
+        when(auditLogService.findById(siteId, auditLogId)).thenReturn(Optional.of(drawLog));
 
         // findKujiReversalsForAuditLog uses a native query through entityManager.
         jakarta.persistence.Query nativeQuery = mock(jakarta.persistence.Query.class);
@@ -471,7 +490,7 @@ class KujiBoxServiceTest {
                 .item(linkedProduct)
                 .metadata(originalMeta)
                 .build();
-        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId))
+        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId, siteId))
                 .thenReturn(List.of(original));
 
         service.undoDraw(siteId, boxId, auditLogId, actorId);
@@ -480,6 +499,11 @@ class KujiBoxServiceTest {
                 "activeCount must be restored to pre-draw value");
         assertEquals(0, tier.getDrawnCount(),
                 "drawnCount must decrement and clamp at 0");
+
+        org.mockito.ArgumentCaptor<com.mirai.inventoryservice.models.audit.Notification> notif =
+                org.mockito.ArgumentCaptor.forClass(com.mirai.inventoryservice.models.audit.Notification.class);
+        verify(notificationService).createNotification(notif.capture());
+        assertEquals(siteId, notif.getValue().getSiteId());
 
         // Review finding P2 regression: the audit broadcast must carry this box's real site.
         verify(broadcastService).broadcastAuditLogCreated(siteId, box.getProduct().getId().toString());
@@ -566,7 +590,7 @@ class KujiBoxServiceTest {
                 .id(auditLogId)
                 .reason(StockMovementReason.KUJI_PRIZE_WON)
                 .build();
-        when(auditLogService.findById(auditLogId)).thenReturn(Optional.of(drawLog));
+        when(auditLogService.findById(siteId, auditLogId)).thenReturn(Optional.of(drawLog));
 
         jakarta.persistence.Query nativeQuery = mock(jakarta.persistence.Query.class);
         when(entityManager.createNativeQuery(any(String.class), eq(StockMovement.class)))
@@ -586,7 +610,7 @@ class KujiBoxServiceTest {
                 .item(linkedProduct)
                 .metadata(originalMeta)
                 .build();
-        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId))
+        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId, siteId))
                 .thenReturn(List.of(original));
 
         service.undoDraw(siteId, boxId, auditLogId, actorId);
@@ -608,7 +632,7 @@ class KujiBoxServiceTest {
                 .id(auditLogId)
                 .reason(StockMovementReason.KUJI_PRIZE_WON)
                 .build();
-        when(auditLogService.findById(auditLogId)).thenReturn(Optional.of(drawLog));
+        when(auditLogService.findById(siteId, auditLogId)).thenReturn(Optional.of(drawLog));
 
         jakarta.persistence.Query nativeQuery = mock(jakarta.persistence.Query.class);
         when(entityManager.createNativeQuery(any(String.class), eq(StockMovement.class)))
@@ -628,7 +652,7 @@ class KujiBoxServiceTest {
                 .item(linkedProduct)
                 .metadata(originalMeta)
                 .build();
-        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId))
+        when(inventoryQueries.findByAuditLogIdWithItem(auditLogId, siteId))
                 .thenReturn(List.of(original));
 
         service.undoDraw(siteId, boxId, auditLogId, actorId);

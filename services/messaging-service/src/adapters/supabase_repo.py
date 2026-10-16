@@ -182,6 +182,7 @@ class SupabaseRepo:
         source_event_id: str | None = None,
         dedupe_key: str | None = None,
         via: list[str] | None = None,
+        site_id: str | None = None,
     ) -> str | None:
         """Create a notification record in the database.
 
@@ -196,6 +197,7 @@ class SupabaseRepo:
             source_event_id: Optional source Kafka event ID for idempotency
             dedupe_key: Optional deduplication key (e.g., "LOW_LOC:{item_id}:{location}")
             via: Optional list of delivery channels (e.g., ["slack", "app"]). Defaults to ["slack", "app"].
+            site_id: Optional site UUID the notification belongs to
 
         Returns:
             Created notification ID, or None if creation failed or duplicate
@@ -223,7 +225,8 @@ class SupabaseRepo:
                     metadata,
                     created_at,
                     source_event_id,
-                    dedupe_key
+                    dedupe_key,
+                    site_id
                 ) VALUES (
                     :id,
                     :type,
@@ -236,7 +239,8 @@ class SupabaseRepo:
                     CAST(:metadata AS jsonb),
                     :created_at,
                     :source_event_id,
-                    :dedupe_key
+                    :dedupe_key,
+                    :site_id
                 )
                 ON CONFLICT (dedupe_key)
                 WHERE dedupe_key IS NOT NULL
@@ -257,7 +261,8 @@ class SupabaseRepo:
                     metadata,
                     created_at,
                     source_event_id,
-                    dedupe_key
+                    dedupe_key,
+                    site_id
                 ) VALUES (
                     :id,
                     :type,
@@ -270,7 +275,8 @@ class SupabaseRepo:
                     CAST(:metadata AS jsonb),
                     :created_at,
                     :source_event_id,
-                    :dedupe_key
+                    :dedupe_key,
+                    :site_id
                 )
                 RETURNING id
             """)
@@ -295,6 +301,7 @@ class SupabaseRepo:
                     "created_at": datetime.now(UTC),
                     "source_event_id": uuid.UUID(source_event_id) if source_event_id else None,
                     "dedupe_key": dedupe_key,
+                    "site_id": uuid.UUID(site_id) if site_id else None,
                 }
 
                 result = conn.execute(query, params)
@@ -532,23 +539,34 @@ class SupabaseRepo:
             logger.error("Failed to get review employees: %s", e)
             return []
 
-    def get_employee_id_by_name(self, canonical_name: str) -> str | None:
+    def get_employee_id_by_name(self, canonical_name: str, site_id: str | None = None) -> str | None:
         """Get user ID by canonical name.
 
         Args:
             canonical_name: User's canonical name for reviews.
+            site_id: When given, only an active member of this site can match, so a user
+                cannot be credited at a site they do not belong to.
 
         Returns:
             User UUID or None if not found.
         """
-        query = text("""
-            SELECT id FROM users
-            WHERE canonical_name = :name AND is_review_tracked = true
-        """)
+        membership = ""
+        params: dict = {"name": canonical_name}
+        if site_id:
+            membership = (
+                " AND id IN (SELECT user_id FROM user_site_memberships"
+                " WHERE site_id = :site_id AND is_active = true)"
+            )
+            params["site_id"] = uuid.UUID(site_id)
+        query = text(
+            "SELECT id FROM users WHERE canonical_name = :name AND is_review_tracked = true"
+            + membership
+            + " ORDER BY id LIMIT 1"
+        )
 
         try:
             with self._engine.connect() as conn:
-                result = conn.execute(query, {"name": canonical_name})
+                result = conn.execute(query, params)
                 row = result.fetchone()
                 return str(row.id) if row else None
         except Exception as e:
@@ -563,6 +581,7 @@ class SupabaseRepo:
         review_text: str,
         rating: int,
         reviewer_name: str,
+        site_id: str | None = None,
     ) -> str | None:
         """Create an individual review record.
 
@@ -575,12 +594,13 @@ class SupabaseRepo:
             review_text: Review text content.
             rating: Star rating (1-5).
             reviewer_name: Name of the reviewer.
+            site_id: UUID (string) of the site the review is attributed to.
 
         Returns:
             Review UUID if created, None if duplicate.
         """
         # First get the user ID
-        user_id = self.get_employee_id_by_name(employee_name)
+        user_id = self.get_employee_id_by_name(employee_name, site_id=site_id)
         if not user_id:
             logger.warning("User not found: %s", employee_name)
             return None
@@ -589,10 +609,10 @@ class SupabaseRepo:
         query = text("""
             INSERT INTO reviews (
                 id, external_id, user_id, review_date,
-                review_text, rating, reviewer_name
+                review_text, rating, reviewer_name, site_id
             ) VALUES (
                 :id, :external_id, :user_id, :review_date,
-                :review_text, :rating, :reviewer_name
+                :review_text, :rating, :reviewer_name, :site_id
             )
             ON CONFLICT (external_id, review_date) DO NOTHING
             RETURNING id
@@ -608,6 +628,7 @@ class SupabaseRepo:
                     "review_text": review_text,
                     "rating": rating,
                     "reviewer_name": reviewer_name,
+                    "site_id": uuid.UUID(site_id) if site_id else None,
                 })
                 row = result.fetchone()
                 conn.commit()
@@ -640,7 +661,7 @@ class SupabaseRepo:
         Returns:
             True if successful, False on error.
         """
-        user_id = self.get_employee_id_by_name(employee_name)
+        user_id = self.get_employee_id_by_name(employee_name, site_id=site_id)
         if not user_id:
             logger.warning("User not found for count update: %s", employee_name)
             return False
@@ -795,8 +816,9 @@ class SupabaseRepo:
                 p.name as product_name,
                 p.sku as product_sku,
                 md.started_at,
+                md.site_id,
                 EXTRACT(DAY FROM NOW() - md.started_at)::INTEGER as days_active
-            FROM machine_displays md
+            FROM machine_display md
             JOIN products p ON md.product_id = p.id
             WHERE md.ended_at IS NULL
               AND md.started_at < NOW() - MAKE_INTERVAL(days => :threshold_days)
@@ -817,6 +839,7 @@ class SupabaseRepo:
                         "product_sku": row.product_sku,
                         "started_at": row.started_at.isoformat() if row.started_at else None,
                         "days_active": row.days_active,
+                        "site_id": str(row.site_id) if row.site_id else None,
                     })
                 logger.info("Found %d stale displays (>%d days)", len(displays), threshold_days)
                 return displays
@@ -831,6 +854,7 @@ class SupabaseRepo:
         machine_id: str,
         location_type: str,
         days_active: int,
+        site_id: str | None = None,
     ) -> str | None:
         """Create a stale display notification with deduplication.
 
@@ -843,6 +867,7 @@ class SupabaseRepo:
             machine_id: UUID of the machine.
             location_type: Type of location (e.g., SINGLE_CLAW, DOUBLE_CLAW).
             days_active: Number of days the product has been displayed.
+            site_id: UUID of the site the machine belongs to.
 
         Returns:
             Notification UUID if created, None if duplicate or error.
@@ -869,5 +894,6 @@ class SupabaseRepo:
             item_id=product_id,
             metadata=metadata,
             dedupe_key=dedupe_key,
+            site_id=site_id,
         )
 

@@ -5,7 +5,7 @@ import com.mirai.inventoryservice.lootbox.infrastructure.LootboxPlayRepository;
 import com.mirai.inventoryservice.lootbox.infrastructure.LootboxPrizeRepository;
 import com.mirai.inventoryservice.lootbox.infrastructure.LootboxRepository;
 import com.mirai.inventoryservice.lootbox.infrastructure.LootboxTierRepository;
-import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
+import com.mirai.inventoryservice.reviews.infrastructure.ReviewDailyCountRepository;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;

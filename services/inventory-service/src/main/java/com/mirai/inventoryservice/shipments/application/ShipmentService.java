@@ -18,7 +18,7 @@ import com.mirai.inventoryservice.exceptions.ShipmentNotFoundException;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.catalog.domain.Supplier;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.identity.domain.User;
@@ -36,7 +36,7 @@ import com.mirai.inventoryservice.shipments.domain.Shipment;
 import com.mirai.inventoryservice.shipments.domain.ShipmentItem;
 import com.mirai.inventoryservice.shipments.domain.ShipmentItemAllocation;
 import com.mirai.inventoryservice.sites.domain.Location;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
 import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
@@ -447,6 +447,7 @@ public class ShipmentService {
         // Create the parent audit log up front; its reason / counts are finalized after the loop.
         // All per-item stock movements get linked to this single audit log, mirroring the transfer pattern.
         AuditLog receiveAuditLog = auditLogService.createAuditLog(
+                siteIdOf(shipment),
                 validatedActorId,
                 receivedByUser != null ? receivedByUser.getFullName() : null,
                 StockMovementReason.SHIPMENT_PARTIAL_RECEIPT,
@@ -566,6 +567,7 @@ public class ShipmentService {
                 }
 
                 Notification damageNotif = Notification.builder()
+                        .siteId(siteIdOf(shipment))
                         .type(NotificationType.SHIPMENT_DAMAGED)
                         .severity(NotificationSeverity.WARNING)
                         .message(damagedQuantity + " units of " + productDisplayName + " reported damaged in shipment " + shipment.getShipmentNumber())
@@ -692,6 +694,7 @@ public class ShipmentService {
             completionMetadata.put("category", "shipment");
 
             Notification completionNotif = Notification.builder()
+                    .siteId(siteIdOf(shipment))
                     .type(NotificationType.SHIPMENT_COMPLETED)
                     .severity(NotificationSeverity.INFO)
                     .message("Shipment " + shipment.getShipmentNumber() + " is fully received")
@@ -727,7 +730,7 @@ public class ShipmentService {
         // Broadcast real-time updates to connected clients
         broadcastService.broadcastShipmentUpdated();
         broadcastService.broadcastInventoryUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        broadcastService.broadcastAuditLogCreated(siteId, null);
 
         return savedShipment;
     }
@@ -800,6 +803,7 @@ public class ShipmentService {
         // damaged/display/shop quantities), we still want a single audit row representing
         // the reversal action.
         AuditLog reverseAuditLog = auditLogService.createAuditLog(
+                siteIdOf(shipment),
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_RECEIPT_REVERSED,
@@ -876,7 +880,7 @@ public class ShipmentService {
         // Broadcast updates
         broadcastService.broadcastShipmentUpdated();
         broadcastService.broadcastInventoryUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        broadcastService.broadcastAuditLogCreated(siteId, null);
 
         return savedShipment;
     }
@@ -906,6 +910,7 @@ public class ShipmentService {
         Shipment savedShipment = shipmentRepository.save(shipment);
 
         auditLogService.createShipmentEvent(
+                siteIdOf(shipment),
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_STATUS_OVERRIDDEN,
@@ -919,7 +924,7 @@ public class ShipmentService {
         );
 
         broadcastService.broadcastShipmentUpdated();
-        broadcastService.broadcastAuditLogCreated();
+        broadcastService.broadcastAuditLogCreated(siteId, null);
 
         return savedShipment;
     }
@@ -1294,6 +1299,7 @@ public class ShipmentService {
         }
 
         auditLogService.createShipmentEvent(
+                siteIdOf(shipment),
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_EDITED,
@@ -1337,6 +1343,7 @@ public class ShipmentService {
         changes.add(fieldChange("deleted_items", null, deletedItems));
 
         auditLogService.createShipmentEvent(
+                siteIdOf(shipment),
                 actorId,
                 actorName,
                 StockMovementReason.SHIPMENT_DELETED,
@@ -1366,5 +1373,9 @@ public class ShipmentService {
 
     private record AllocationBucketKey(LocationType locationType, UUID locationId) {
         static final AllocationBucketKey NOT_ASSIGNED = new AllocationBucketKey(LocationType.NOT_ASSIGNED, null);
+    }
+
+    private static UUID siteIdOf(Shipment shipment) {
+        return shipment.getSite() != null ? shipment.getSite().getId() : null;
     }
 }

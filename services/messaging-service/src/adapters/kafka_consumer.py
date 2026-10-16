@@ -225,6 +225,7 @@ class KafkaEventConsumer:
                 # Actor and reference
                 actor_id=payload.actor_id,
                 stock_movement_id=payload.stock_movement_id,
+                site_id=envelope.site_id,
             )
 
             logger.debug(

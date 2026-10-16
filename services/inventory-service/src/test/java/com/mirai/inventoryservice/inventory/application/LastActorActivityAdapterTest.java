@@ -34,15 +34,17 @@ class LastActorActivityAdapterTest {
     @InjectMocks
     private LastActorActivityAdapter adapter;
 
+    private final UUID siteId = UUID.randomUUID();
+
     @Test
     void lastActivityFor_ReturnsMovementTimestamp() {
         UUID actorId = UUID.randomUUID();
         OffsetDateTime at = OffsetDateTime.now();
         StockMovement movement = StockMovement.builder().at(at).build();
-        when(stockMovementRepository.findTopByActorIdOrderByAtDesc(actorId))
+        when(stockMovementRepository.findTopBySite_IdAndActorIdOrderByAtDesc(siteId, actorId))
                 .thenReturn(Optional.of(movement));
 
-        Optional<OffsetDateTime> result = adapter.lastActivityFor(actorId);
+        Optional<OffsetDateTime> result = adapter.lastActivityFor(siteId, actorId);
 
         assertEquals(Optional.of(at), result);
     }
@@ -50,10 +52,10 @@ class LastActorActivityAdapterTest {
     @Test
     void lastActivityFor_NoMovements_ReturnsEmpty() {
         UUID actorId = UUID.randomUUID();
-        when(stockMovementRepository.findTopByActorIdOrderByAtDesc(actorId))
+        when(stockMovementRepository.findTopBySite_IdAndActorIdOrderByAtDesc(siteId, actorId))
                 .thenReturn(Optional.empty());
 
-        assertFalse(adapter.lastActivityFor(actorId).isPresent());
+        assertFalse(adapter.lastActivityFor(siteId, actorId).isPresent());
     }
 
     @Test
@@ -62,21 +64,21 @@ class LastActorActivityAdapterTest {
         UUID actorId2 = UUID.randomUUID();
         OffsetDateTime at1 = OffsetDateTime.now();
         OffsetDateTime at2 = at1.minusDays(1);
-        when(stockMovementRepository.findLatestMovementTimestampsByActor())
+        when(stockMovementRepository.findLatestMovementTimestampsByActor(siteId))
                 .thenReturn(List.of(
                         new Object[] {actorId1, at1},
                         new Object[] {actorId2, at2}));
 
-        Map<UUID, OffsetDateTime> result = adapter.lastActivityByActor();
+        Map<UUID, OffsetDateTime> result = adapter.lastActivityByActor(siteId);
 
         assertEquals(Map.of(actorId1, at1, actorId2, at2), result);
     }
 
     @Test
     void lastActivityByActor_NoMovements_ReturnsEmptyMap() {
-        when(stockMovementRepository.findLatestMovementTimestampsByActor())
+        when(stockMovementRepository.findLatestMovementTimestampsByActor(siteId))
                 .thenReturn(List.of());
 
-        assertTrue(adapter.lastActivityByActor().isEmpty());
+        assertTrue(adapter.lastActivityByActor(siteId).isEmpty());
     }
 }

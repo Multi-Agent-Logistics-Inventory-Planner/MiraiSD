@@ -323,30 +323,20 @@ class RBACAlignmentIT extends BaseIntegrationTest {
     }
 
     /**
-     * Notifications Feature: EMPLOYEE + ADMIN
-     * Backend: NotificationController requires EMPLOYEE or ADMIN role
+     * Notifications are a Slack delivery queue only; no REST surface reads them.
      */
     @Nested
-    @DisplayName("Notifications (EMPLOYEE + ADMIN)")
-    class NotificationPermissions {
+    @DisplayName("Notifications REST surface is removed")
+    class NotificationsRemoved {
 
         @Test
-        @DisplayName("Employee can view notifications")
-        void employee_canViewNotifications() throws Exception {
-            mockMvc.perform(get("/api/notifications")
-                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
-                    .andExpect(result -> {
-                        int status = result.getResponse().getStatus();
-                        org.assertj.core.api.Assertions.assertThat(status).isNotIn(401, 403);
-                    });
-        }
-
-        @Test
-        @DisplayName("Admin can view notifications")
-        void admin_canViewNotifications() throws Exception {
-            mockMvc.perform(get("/api/notifications")
-                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
-                    .andExpect(status().isOk());
+        @DisplayName("Admin gets 404 for the retired notifications endpoints")
+        void admin_cannotReachNotificationEndpoints() throws Exception {
+            String token = adminTokenWithMainMembership();
+            for (String path : new String[] {"/api/notifications", "/api/notifications/unread", "/api/notifications/counts"}) {
+                mockMvc.perform(get(path).header("Authorization", "Bearer " + token))
+                        .andExpect(status().isNotFound());
+            }
         }
     }
 

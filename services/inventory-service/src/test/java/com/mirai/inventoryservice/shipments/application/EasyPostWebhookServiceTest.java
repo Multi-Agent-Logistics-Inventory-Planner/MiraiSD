@@ -82,6 +82,28 @@ class EasyPostWebhookServiceTest {
     }
 
     @Test
+    void deliveredNotificationCarriesTheShipmentsSite() {
+        UUID siteId = UUID.randomUUID();
+        shipment.setSite(com.mirai.inventoryservice.sites.domain.Site.builder().id(siteId).code("SECOND").name("Second").build());
+        EasyPostTrackerResult tracker = new EasyPostTrackerResult();
+        tracker.setId("trk_1");
+        tracker.setStatus("delivered");
+        EasyPostWebhookPayload payload = new EasyPostWebhookPayload();
+        payload.setId("evt_1");
+        payload.setDescription("tracker.updated");
+        payload.setResult(tracker);
+
+        when(webhookEventRepository.existsByEventIdAndSource("evt_1", "easypost")).thenReturn(false);
+        when(shipmentRepository.findByEasypostTrackerId("trk_1")).thenReturn(Optional.of(shipment));
+
+        service.processWebhook(payload);
+
+        ArgumentCaptor<Notification> notif = ArgumentCaptor.forClass(Notification.class);
+        verify(notificationService).createNotification(notif.capture());
+        assertEquals(siteId, notif.getValue().getSiteId());
+    }
+
+    @Test
     void deliveredEventCreatesPackageArrivedNotification() {
         EasyPostTrackerResult tracker = new EasyPostTrackerResult();
         tracker.setId("trk_1");

@@ -10,7 +10,7 @@ import com.mirai.inventoryservice.displays.api.SwapMachineDisplayRequestDTO;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
+import com.mirai.inventoryservice.audit.infrastructure.AuditLogRepository;
 import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.sites.domain.Location;

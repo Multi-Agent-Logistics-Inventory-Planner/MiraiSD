@@ -1,0 +1,41 @@
+package com.mirai.inventoryservice.reviews.infrastructure;
+
+import com.mirai.inventoryservice.reviews.domain.Review;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Repository
+public interface ReviewRepository extends JpaRepository<Review, UUID> {
+
+    Optional<Review> findByExternalId(String externalId);
+
+    boolean existsByExternalId(String externalId);
+
+    List<Review> findByReviewDateOrderByCreatedAtDesc(LocalDate date);
+
+    @Query(value = "SELECT r FROM Review r JOIN FETCH r.user u WHERE u.id = :userId AND r.siteId = :siteId "
+            + "ORDER BY r.reviewDate DESC",
+            countQuery = "SELECT COUNT(r) FROM Review r WHERE r.user.id = :userId AND r.siteId = :siteId")
+    Page<Review> findByUserIdAndSiteIdWithUser(
+            @Param("userId") UUID userId, @Param("siteId") UUID siteId, Pageable pageable);
+
+    @Query(value = "SELECT r FROM Review r JOIN FETCH r.user u WHERE u.id = :userId AND r.siteId = :siteId "
+            + "AND r.reviewDate >= :startDate AND r.reviewDate <= :endDate ORDER BY r.reviewDate DESC",
+            countQuery = "SELECT COUNT(r) FROM Review r WHERE r.user.id = :userId AND r.siteId = :siteId "
+                    + "AND r.reviewDate >= :startDate AND r.reviewDate <= :endDate")
+    Page<Review> findByUserIdAndSiteIdAndDateRangeWithUser(
+            @Param("userId") UUID userId,
+            @Param("siteId") UUID siteId,
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate,
+            Pageable pageable);
+}

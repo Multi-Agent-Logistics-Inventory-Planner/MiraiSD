@@ -6,7 +6,7 @@ import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
 import com.mirai.inventoryservice.dtos.requests.AuditLogFilterDTO;
-import com.mirai.inventoryservice.dtos.responses.AuditLogDTO;
+import com.mirai.inventoryservice.audit.api.AuditLogDTO;
 import com.mirai.inventoryservice.integration.BaseKafkaIntegrationTest;
 import com.mirai.inventoryservice.inventory.api.InventoryTotalDTO;
 import com.mirai.inventoryservice.inventory.api.ProductInventoryResponseDTO;
@@ -16,8 +16,8 @@ import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepo
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.infrastructure.AuditLogRepository;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.Site;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
@@ -171,6 +171,10 @@ class InventoryEgressBaselineIT extends BaseKafkaIntegrationTest {
         categoryRepository.deleteAllInBatch();
     }
 
+    private UUID mainSiteId() {
+        return siteRepository.findByCode("MAIN").orElseThrow().getId();
+    }
+
     private void seedFixedCatalog() {
         Site main = siteRepository.findByCode("MAIN")
                 .orElseGet(() -> siteRepository.save(Site.builder().code("MAIN").name("Main").build()));
@@ -246,6 +250,7 @@ class InventoryEgressBaselineIT extends BaseKafkaIntegrationTest {
 
         // Populate the audit log so its baseline measures a real page, not an empty one.
         seededAuditLogId = auditLogService.createAuditLog(
+                main.getId(),
                 null,
                 StockMovementReason.SHIPMENT_RECEIPT,
                 null,
@@ -430,7 +435,7 @@ class InventoryEgressBaselineIT extends BaseKafkaIntegrationTest {
 
         Measurement m = measure(
                 "GET /api/audit-logs (page 0, size 20)",
-                () -> auditLogService.getAuditLogs(filters, PageRequest.of(0, 20)),
+                () -> auditLogService.getAuditLogs(mainSiteId(), filters, PageRequest.of(0, 20)),
                 (Page<AuditLogDTO> r) -> r.getContent().size(),
                 List.of(new DbQuery(dbSql)));
 

@@ -119,6 +119,7 @@ class EventEnvelope(BaseModel):
     payload: EventPayload = Field(..., description="Event payload")
     created_at: datetime = Field(..., description="Event creation timestamp")
     correlation_id: str | None = Field(None, description="ID tying this event back to the triggering request")
+    site_id: str | None = Field(None, description="Site the event happened at")
 
     @field_validator("created_at", mode="before")
     @classmethod
@@ -157,5 +158,7 @@ class NormalizedEvent:
     # Actor and reference
     actor_id: str | None = None
     stock_movement_id: str | None = None
+
+    site_id: str | None = None
 
 

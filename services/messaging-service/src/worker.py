@@ -354,7 +354,8 @@ class MessagingWorker:
         # Build dedupe_key for idempotency (includes date to allow re-alerting next day)
         from datetime import date
         today = date.today().isoformat()
-        dedupe_key = f"{alert.alert_type.value}:{event.item_id}:{today}"
+        site_part = f"{event.site_id}:" if event.site_id else ""
+        dedupe_key = f"{alert.alert_type.value}:{site_part}{event.item_id}:{today}"
 
         # Build metadata for UI display
         metadata = {
@@ -379,6 +380,7 @@ class MessagingWorker:
             source_event_id=event.event_id,
             dedupe_key=dedupe_key,
             via=via,
+            site_id=event.site_id,
         )
 
         if notification_id:

@@ -1,13 +1,13 @@
 package com.mirai.inventoryservice.services;
 
 import com.mirai.inventoryservice.dtos.responses.ActivityFeedEventDTO;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.NotificationSeverity;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.shipments.domain.Shipment;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,19 +26,12 @@ import java.util.UUID;
 @Slf4j
 public class ActivityFeedService {
 
-    private final AuditLogRepository auditLogRepository;
+    private final AuditLogService auditLogService;
     private final ShipmentRepository shipmentRepository;
     private final NotificationRepository notificationRepository;
 
     private static final Set<String> STOCK_MOVEMENT_TYPES = Set.of("restock", "sale", "adjustment", "transfer");
 
-    /**
-     * Audit-log and notification reads below are not yet site-scoped ({@code AuditLog}/
-     * {@code Notification} carry no {@code site_id} column) -- that is the
-     * notifications-reviews-audit slice's responsibility, not this one's. Only the shipment
-     * portion is scoped here, per .specs/phase-7-shipments AC-2, since shipments already carries
-     * {@code site_id} and a site-scoped query.
-     */
     @Transactional(readOnly = true)
     public List<ActivityFeedEventDTO> getActivityFeed(UUID siteId, int limit, List<String> types, boolean includeResolved) {
         List<ActivityFeedEventDTO> events = new ArrayList<>();
@@ -47,11 +40,14 @@ public class ActivityFeedService {
         // Fetch audit logs for stock movements (restock, sale, adjustment, transfer)
         if (typeSet == null || typeSet.stream().anyMatch(STOCK_MOVEMENT_TYPES::contains)) {
             OffsetDateTime sevenDaysAgo = OffsetDateTime.now().minusDays(7);
-            var auditLogs = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(
-                    sevenDaysAgo, OffsetDateTime.now(), PageRequest.of(0, 100));
+            var auditLogs = auditLogService.findRecent(
+                    siteId, sevenDaysAgo, OffsetDateTime.now(), PageRequest.of(0, 100));
 
             for (AuditLog auditLog : auditLogs.getContent()) {
                 for (StockMovement movement : auditLog.getMovements()) {
+                    if (movement.getSite() == null || !siteId.equals(movement.getSite().getId())) {
+                        continue;
+                    }
                     // Kuji activity has a dedicated per-kuji session feed; skip everything kuji here so the main feed stays focused on inventory ops.
                     if (movement.getReason() == StockMovementReason.KUJI_PRIZE_WON
                             || movement.getReason() == StockMovementReason.KUJI_DRAW_REVERSED
@@ -110,11 +106,11 @@ public class ActivityFeedService {
             int notificationLimit = Math.min(limit, 100);
             List<Notification> notifications;
             if (includeResolved) {
-                notifications = notificationRepository.findAllByOrderByCreatedAtDesc(
-                        PageRequest.of(0, notificationLimit)).getContent();
+                notifications = notificationRepository.findBySiteIdOrderByCreatedAtDesc(
+                        siteId, PageRequest.of(0, notificationLimit)).getContent();
             } else {
-                notifications = notificationRepository.findUnresolvedOrderByCreatedAtDesc(
-                        PageRequest.of(0, notificationLimit)).getContent();
+                notifications = notificationRepository.findUnresolvedBySiteIdOrderByCreatedAtDesc(
+                        siteId, PageRequest.of(0, notificationLimit)).getContent();
             }
 
             for (Notification notification : notifications) {

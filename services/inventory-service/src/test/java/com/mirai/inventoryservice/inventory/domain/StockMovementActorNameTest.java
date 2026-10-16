@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.inventory.domain;
 
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
