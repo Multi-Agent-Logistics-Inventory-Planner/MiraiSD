@@ -1,0 +1,3 @@
+# inventory-service has no XsltView or SSE view rendering; remove once Spring Framework is patched or upgraded.
+CVE-2026-47884
+CVE-2026-47890
