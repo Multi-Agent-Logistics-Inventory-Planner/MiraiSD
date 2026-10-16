@@ -29,7 +29,7 @@ export function useLocationsWithCounts(locationType?: LocationType) {
 /**
  * All locations across every type, unfiltered (.specs/phase-6-inventory 6e, T-6e-9). Used by
  * the dashboard's location-utilization metric, which previously held its own separate,
- * never-invalidated cache of the legacy site-blind endpoint (`use-dashboard-metrics.ts`'s
+ * never-invalidated cache of the legacy site-blind endpoint (the old dashboard metrics hook's
  * `["locations", "with-counts"]`); now shares this module's site-scoped query/key family so a
  * single realtime/mutation invalidation reaches both call sites.
  */

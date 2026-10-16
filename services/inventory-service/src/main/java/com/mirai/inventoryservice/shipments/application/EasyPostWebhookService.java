@@ -278,6 +278,7 @@ public class EasyPostWebhookService {
         metadata.put("category", "tracking");
 
         Notification notification = Notification.builder()
+                .siteId(shipment.getSite() != null ? shipment.getSite().getId() : null)
                 .type(type)
                 .severity(severity)
                 .message(message)

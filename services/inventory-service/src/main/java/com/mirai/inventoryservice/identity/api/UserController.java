@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.identity.api;
 import com.mirai.inventoryservice.identity.api.UserMapper;
 import com.mirai.inventoryservice.identity.api.UserRequestDTO;
 import com.mirai.inventoryservice.identity.api.UserResponseDTO;
+import com.mirai.inventoryservice.identity.application.LegacyMainSiteContextResolver;
 import com.mirai.inventoryservice.identity.domain.User;
 import com.mirai.inventoryservice.identity.application.UserService;
 import jakarta.validation.Valid;
@@ -21,16 +22,23 @@ import java.util.UUID;
 public class UserController {
     private final UserService userService;
     private final UserMapper userMapper;
+    private final LegacyMainSiteContextResolver legacyMainSiteContextResolver;
 
-    public UserController(UserService userService, UserMapper userMapper) {
+    public UserController(UserService userService, UserMapper userMapper,
+                          LegacyMainSiteContextResolver legacyMainSiteContextResolver) {
         this.userService = userService;
         this.userMapper = userMapper;
+        this.legacyMainSiteContextResolver = legacyMainSiteContextResolver;
+    }
+
+    private UUID legacySiteId() {
+        return legacyMainSiteContextResolver.requireMain().siteId();
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<List<UserResponseDTO>> getAllUsers() {
-        List<User> users = userService.getAllUsers();
+        List<User> users = userService.findActiveSiteMembers(legacySiteId());
         return ResponseEntity.ok(userMapper.toResponseDTOList(users));
     }
 
@@ -44,13 +52,13 @@ public class UserController {
     @GetMapping("/{id}/last-audit")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<OffsetDateTime> getLastAudit(@PathVariable UUID id) {
-        return ResponseEntity.ok(userService.getLastAuditDate(id).orElse(null));
+        return ResponseEntity.ok(userService.getLastAuditDate(legacySiteId(), id).orElse(null));
     }
 
     @GetMapping("/last-audits")
     @PreAuthorize("hasAnyRole('ADMIN', 'ASSISTANT_MANAGER', 'EMPLOYEE')")
     public ResponseEntity<Map<UUID, OffsetDateTime>> getAllLastAudits() {
-        return ResponseEntity.ok(userService.getAllLastAuditDates());
+        return ResponseEntity.ok(userService.getSiteLastAuditDates(legacySiteId()));
     }
 
     @GetMapping("/email/{email}")

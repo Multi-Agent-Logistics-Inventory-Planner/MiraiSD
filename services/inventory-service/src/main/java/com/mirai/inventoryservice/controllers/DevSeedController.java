@@ -3,7 +3,7 @@ package com.mirai.inventoryservice.controllers;
 import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.sites.domain.Site;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.audit.ForecastPrediction;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
@@ -17,13 +17,13 @@ import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.identity.domain.UserRole;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
-import com.mirai.inventoryservice.models.review.Review;
-import com.mirai.inventoryservice.models.review.ReviewDailyCount;
+import com.mirai.inventoryservice.reviews.domain.Review;
+import com.mirai.inventoryservice.reviews.domain.ReviewDailyCount;
 import com.mirai.inventoryservice.shipments.domain.Shipment;
 import com.mirai.inventoryservice.shipments.domain.ShipmentItem;
 import com.mirai.inventoryservice.sites.domain.Location;
 import com.mirai.inventoryservice.sites.domain.StorageLocation;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
+import com.mirai.inventoryservice.audit.infrastructure.AuditLogRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.repositories.ForecastPredictionRepository;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
@@ -31,8 +31,8 @@ import com.mirai.inventoryservice.sites.infrastructure.LocationRepository;
 import com.mirai.inventoryservice.displays.infrastructure.MachineDisplayRepository;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
-import com.mirai.inventoryservice.repositories.ReviewDailyCountRepository;
-import com.mirai.inventoryservice.repositories.ReviewRepository;
+import com.mirai.inventoryservice.reviews.infrastructure.ReviewDailyCountRepository;
+import com.mirai.inventoryservice.reviews.infrastructure.ReviewRepository;
 import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
 import com.mirai.inventoryservice.sites.application.SiteDirectory;
 import com.mirai.inventoryservice.sites.infrastructure.SiteRepository;
@@ -737,6 +737,7 @@ public class DevSeedController {
                 : null;
 
             Notification notification = Notification.builder()
+                .siteId(defaultSiteId())
                 .type(type)
                 .severity(severity)
                 .message(message)
@@ -756,6 +757,7 @@ public class DevSeedController {
 
         // Add system notifications
         notifications.add(Notification.builder()
+                .siteId(defaultSiteId())
             .type(NotificationType.SYSTEM_ALERT)
             .severity(NotificationSeverity.INFO)
             .message("Weekly inventory report generated successfully")
@@ -766,6 +768,7 @@ public class DevSeedController {
             .build());
 
         notifications.add(Notification.builder()
+                .siteId(defaultSiteId())
             .type(NotificationType.SYSTEM_ALERT)
             .severity(NotificationSeverity.INFO)
             .message("Forecasting service completed daily predictions")
@@ -942,6 +945,7 @@ public class DevSeedController {
                         i);
 
                     Review review = Review.builder()
+                        .siteId(siteId)
                         .externalId(externalId)
                         .user(user)
                         .reviewDate(currentDate)
@@ -1142,6 +1146,7 @@ public class DevSeedController {
 
             // Create the audit log entry
             AuditLog auditLog = AuditLog.builder()
+                .siteId(defaultSiteId())
                 .actorId(actorId)
                 .actorName(actorName)
                 .reason(reason)
@@ -1669,5 +1674,9 @@ public class DevSeedController {
                 .map(u -> Map.of("email", u.getEmail(), "name", u.getFullName(), "role", u.getRole().name()))
                 .toList()
         ));
+    }
+
+    private UUID defaultSiteId() {
+        return analyticsSeedService.getDefaultSite().getId();
     }
 }

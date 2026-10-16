@@ -43,6 +43,10 @@ public class Notification {
     @Column(nullable = false)
     private String message;
 
+    // Nullable until the constrain release, once every writer (including the messaging service) sets it.
+    @Column(name = "site_id")
+    private UUID siteId;
+
     @Column(name = "recipient_id")
     private UUID recipientId;  // User to notify
 

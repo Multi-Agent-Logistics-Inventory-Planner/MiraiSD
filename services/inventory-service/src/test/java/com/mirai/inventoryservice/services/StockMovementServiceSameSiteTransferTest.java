@@ -13,9 +13,9 @@ import com.mirai.inventoryservice.inventory.domain.LocationInventory;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository.LocationProductIds;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.enums.LocationType;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.EventOutboxService;
 import com.mirai.inventoryservice.services.SupabaseBroadcastService;
 import com.mirai.inventoryservice.sites.application.LocationService;
@@ -65,7 +65,7 @@ import static org.mockito.Mockito.when;
 class StockMovementServiceSameSiteTransferTest {
 
     @Mock private StockMovementRepository stockMovementRepository;
-    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AuditLogService auditLogService;
     @Mock private CatalogQueries catalogQueries;
     @Mock private ProductStockStateWriter productStockStateWriter;
     @Mock private UserRepository userRepository;
@@ -84,14 +84,14 @@ class StockMovementServiceSameSiteTransferTest {
     @BeforeEach
     void setUp() {
         service = new StockMovementService(
-                stockMovementRepository, auditLogRepository, catalogQueries, productStockStateWriter,
+                stockMovementRepository, auditLogService, catalogQueries, productStockStateWriter,
                 userRepository, locationInventoryRepository, locationRepository, locationService,
                 entityManager, broadcastService, eventOutboxService);
 
         mainSite = Site.builder().id(UUID.randomUUID()).code("MAIN").name("Main").build();
         secondSite = Site.builder().id(UUID.randomUUID()).code("SECOND").name("Second").build();
 
-        when(auditLogRepository.save(any())).thenAnswer(inv -> {
+        when(auditLogService.save(any())).thenAnswer(inv -> {
             AuditLog log = inv.getArgument(0);
             log.setId(UUID.randomUUID());
             return log;
@@ -192,6 +192,30 @@ class StockMovementServiceSameSiteTransferTest {
 
         verify(locationInventoryRepository).save(source);
         verify(locationInventoryRepository).save(destination);
+    }
+
+    @Test
+    void transferInventory_sameSite_stampsTheSourceSiteOnTheAuditLog() {
+        LocationInventory source = inventoryAt(mainSite, 10);
+        LocationInventory destination = sameSiteDestination(source, 5);
+        stubExistingRow(source);
+        stubExistingRow(destination);
+        when(locationInventoryRepository.findById(source.getId())).thenReturn(Optional.of(source));
+        when(locationInventoryRepository.findById(destination.getId())).thenReturn(Optional.of(destination));
+        when(locationInventoryRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        when(stockMovementRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        service.transferInventory(TransferInventoryRequestDTO.builder()
+                .sourceLocationType(LocationType.BOX_BIN)
+                .sourceInventoryId(source.getId())
+                .destinationLocationType(LocationType.BOX_BIN)
+                .destinationInventoryId(destination.getId())
+                .quantity(3)
+                .build());
+
+        org.mockito.ArgumentCaptor<AuditLog> saved = org.mockito.ArgumentCaptor.forClass(AuditLog.class);
+        verify(auditLogService, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        org.junit.jupiter.api.Assertions.assertEquals(mainSite.getId(), saved.getAllValues().get(0).getSiteId());
     }
 
     // ---- transferInventory: create-new-inventory-at-location path, cross-site rejected before create ----

@@ -48,8 +48,13 @@ class TestMessagingServiceEnvelopeCompatibility:
         envelope = messaging_events.EventEnvelope.model_validate(sample_full_payload)
         assert envelope.correlation_id == sample_full_payload["correlation_id"]
 
+    def test_models_site_id_so_notifications_can_be_stamped(self, sample_full_payload):
+        assert "site_id" in messaging_events.EventEnvelope.model_fields
+        envelope = messaging_events.EventEnvelope.model_validate(sample_full_payload)
+        assert envelope.site_id == sample_full_payload["site_id"]
+
     def test_ignores_unknown_extra_fields_it_does_not_declare(self, sample_full_payload):
-        assert "site_id" not in messaging_events.EventEnvelope.model_fields
+        assert "causation_id" not in messaging_events.EventEnvelope.model_fields
         envelope = messaging_events.EventEnvelope.model_validate(sample_full_payload)
         assert envelope.event_id == sample_full_payload["event_id"]
 

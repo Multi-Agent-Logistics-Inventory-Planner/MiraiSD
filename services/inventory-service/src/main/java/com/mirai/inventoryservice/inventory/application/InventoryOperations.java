@@ -134,7 +134,7 @@ public class InventoryOperations {
      */
     @Transactional
     public StockMovement recordMovement(
-            com.mirai.inventoryservice.models.audit.AuditLog auditLog,
+            com.mirai.inventoryservice.audit.domain.AuditLog auditLog,
             Product product,
             LocationType locationType,
             UUID fromLocationId,
@@ -195,7 +195,7 @@ public class InventoryOperations {
             Product product,
             int quantityDelta,
             LocationType locationType,
-            com.mirai.inventoryservice.models.audit.AuditLog auditLog,
+            com.mirai.inventoryservice.audit.domain.AuditLog auditLog,
             StockMovementReason reason,
             UUID actorId,
             Map<String, Object> metadata) {

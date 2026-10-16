@@ -35,12 +35,11 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     // Find recent movements (last 30 days, etc)
     List<StockMovement> findByItem_IdAndAtAfterOrderByAtDesc(UUID productId, OffsetDateTime since);
 
-    // Find most recent movement by actor (user)
-    Optional<StockMovement> findTopByActorIdOrderByAtDesc(UUID actorId);
+    Optional<StockMovement> findTopBySite_IdAndActorIdOrderByAtDesc(UUID siteId, UUID actorId);
 
-    // Bulk query: find most recent movement timestamp for each actor
-    @Query("SELECT sm.actorId, MAX(sm.at) FROM StockMovement sm WHERE sm.actorId IS NOT NULL GROUP BY sm.actorId")
-    List<Object[]> findLatestMovementTimestampsByActor();
+    @Query("SELECT sm.actorId, MAX(sm.at) FROM StockMovement sm "
+            + "WHERE sm.site.id = :siteId AND sm.actorId IS NOT NULL GROUP BY sm.actorId")
+    List<Object[]> findLatestMovementTimestampsByActor(@Param("siteId") UUID siteId);
 
     // Audit log query with eager fetch of item to avoid N+1
     @EntityGraph(value = "StockMovement.withItem")
@@ -53,9 +52,8 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.reason = :reason AND sm.at >= :since AND sm.at < :until")
     List<StockMovement> findByReasonAndAtBetweenWithItem(@Param("reason") StockMovementReason reason, @Param("since") OffsetDateTime since, @Param("until") OffsetDateTime until);
 
-    // Find all movements for a specific audit log
-    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId ORDER BY sm.id")
-    List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId);
+    @Query("SELECT sm FROM StockMovement sm JOIN FETCH sm.item WHERE sm.auditLog.id = :auditLogId AND sm.site.id = :siteId ORDER BY sm.id")
+    List<StockMovement> findByAuditLogIdWithItem(@Param("auditLogId") java.util.UUID auditLogId, @Param("siteId") java.util.UUID siteId);
 
     // Find stock movements by metadata source (used for dev seed cleanup)
     @Query(value = "SELECT * FROM stock_movements WHERE metadata->>'source' = :source", nativeQuery = true)

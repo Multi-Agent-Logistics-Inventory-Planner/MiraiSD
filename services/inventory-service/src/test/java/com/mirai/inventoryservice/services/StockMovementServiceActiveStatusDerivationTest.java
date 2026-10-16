@@ -8,11 +8,11 @@ import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.inventory.api.BatchAdjustLineDTO;
 import com.mirai.inventoryservice.inventory.api.BatchAdjustStockRequestDTO;
 import com.mirai.inventoryservice.identity.infrastructure.UserRepository;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.enums.LocationType;
 import com.mirai.inventoryservice.models.enums.StockMovementReason;
 import com.mirai.inventoryservice.inventory.domain.LocationInventory;
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.inventory.infrastructure.LocationInventoryRepository;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.inventory.application.StockMovementService;
@@ -77,7 +77,7 @@ import static org.mockito.Mockito.when;
 class StockMovementServiceActiveStatusDerivationTest {
 
     @Mock private StockMovementRepository stockMovementRepository;
-    @Mock private AuditLogRepository auditLogRepository;
+    @Mock private AuditLogService auditLogService;
     @Mock private CatalogQueries catalogQueries;
     @Mock private ProductStockStateWriter productStockStateWriter;
     @Mock private UserRepository userRepository;
@@ -93,7 +93,7 @@ class StockMovementServiceActiveStatusDerivationTest {
     @BeforeEach
     void setUp() {
         service = new StockMovementService(
-                stockMovementRepository, auditLogRepository, catalogQueries, productStockStateWriter,
+                stockMovementRepository, auditLogService, catalogQueries, productStockStateWriter,
                 userRepository, locationInventoryRepository, locationRepository, locationService,
                 entityManager, broadcastService, eventOutboxService);
     }
@@ -151,7 +151,7 @@ class StockMovementServiceActiveStatusDerivationTest {
         LocationInventory inventory = inventoryFixture(inventoryId, productId, 10);
         when(locationInventoryRepository.findById(inventoryId)).thenReturn(java.util.Optional.of(inventory));
         when(locationInventoryRepository.sumQuantityByProductId(productId)).thenReturn(0);
-        when(auditLogRepository.save(any())).thenAnswer(inv -> {
+        when(auditLogService.save(any())).thenAnswer(inv -> {
             AuditLog log = inv.getArgument(0);
             log.setId(UUID.randomUUID());
             return log;
@@ -174,7 +174,7 @@ class StockMovementServiceActiveStatusDerivationTest {
         LocationInventory inventory = inventoryFixture(inventoryId, productId, 10);
         when(locationInventoryRepository.findById(inventoryId)).thenReturn(java.util.Optional.of(inventory));
         when(locationInventoryRepository.sumQuantityByProductId(productId)).thenReturn(6);
-        when(auditLogRepository.save(any())).thenAnswer(inv -> {
+        when(auditLogService.save(any())).thenAnswer(inv -> {
             AuditLog log = inv.getArgument(0);
             log.setId(UUID.randomUUID());
             return log;
@@ -221,7 +221,7 @@ class StockMovementServiceActiveStatusDerivationTest {
     }
 
     private void stubCommonBatchCollaborators() {
-        when(auditLogRepository.save(any())).thenAnswer(inv -> {
+        when(auditLogService.save(any())).thenAnswer(inv -> {
             AuditLog log = inv.getArgument(0);
             log.setId(UUID.randomUUID());
             return log;

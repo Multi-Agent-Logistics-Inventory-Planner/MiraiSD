@@ -10,7 +10,7 @@ import com.mirai.inventoryservice.displays.api.MachineDisplayDTO;
 import com.mirai.inventoryservice.sites.domain.LocationNotFoundException;
 import com.mirai.inventoryservice.displays.domain.MachineDisplay;
 import com.mirai.inventoryservice.catalog.domain.Product;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.models.audit.Notification;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.models.enums.LocationType;
@@ -25,7 +25,7 @@ import com.mirai.inventoryservice.catalog.application.CatalogEntityAccess;
 import com.mirai.inventoryservice.catalog.application.ProductRef;
 import com.mirai.inventoryservice.inventory.application.InventoryOperations;
 import com.mirai.inventoryservice.identity.application.UserService;
-import com.mirai.inventoryservice.services.AuditLogService;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.services.NotificationService;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -114,6 +114,7 @@ public class MachineDisplayService {
 
         String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
         AuditLog auditLog = auditLogService.createAuditLog(
+                resolveMachineSite(request.getMachineId()).getId(),
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SET,
                 null, null,
@@ -147,6 +148,7 @@ public class MachineDisplayService {
         currentNames.add(product.name());
         emitDisplayNotification(
                 NotificationType.DISPLAY_SET,
+                request.getMachineId(),
                 request.getActorId(),
                 now,
                 List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
@@ -220,6 +222,7 @@ public class MachineDisplayService {
                 .map(id -> productsById.get(id).name())
                 .collect(Collectors.toList());
         AuditLog auditLog = auditLogService.createAuditLog(
+                resolveMachineSite(request.getMachineId()).getId(),
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SET,
                 null, null,
@@ -255,6 +258,7 @@ public class MachineDisplayService {
         currentNames.addAll(productNames);
         emitDisplayNotification(
                 NotificationType.DISPLAY_SET,
+                request.getMachineId(),
                 request.getActorId(),
                 now,
                 List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
@@ -284,6 +288,7 @@ public class MachineDisplayService {
                 .map(d -> d.getProduct().getName())
                 .collect(Collectors.toList());
         AuditLog auditLog = auditLogService.createAuditLog(
+                resolveMachineSite(machineId).getId(),
                 actorId,
                 StockMovementReason.DISPLAY_REMOVED,
                 machineId, machineCode,
@@ -314,6 +319,7 @@ public class MachineDisplayService {
 
         emitDisplayNotification(
                 NotificationType.DISPLAY_REMOVED,
+                machineId,
                 actorId,
                 now,
                 List.of(new MachineSnapshot(machineCode, productNames, List.of()))
@@ -381,6 +387,7 @@ public class MachineDisplayService {
                 .map(d -> d.getProduct().getName())
                 .collect(Collectors.toList());
         AuditLog auditLog = auditLogService.createAuditLog(
+                resolveMachineSite(machineId).getId(),
                 request.getActorId(),
                 StockMovementReason.DISPLAY_REMOVED,
                 machineId, machineCode,
@@ -418,6 +425,7 @@ public class MachineDisplayService {
                 .collect(Collectors.toList());
         emitDisplayNotification(
                 NotificationType.DISPLAY_REMOVED,
+                machineId,
                 request.getActorId(),
                 now,
                 List.of(new MachineSnapshot(machineCode, previousNames, currentNames))
@@ -483,6 +491,7 @@ public class MachineDisplayService {
         String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
         String productSummary = outgoingProductName + " → " + incoming.name();
         auditLogService.createAuditLog(
+                resolveMachineSite(request.getMachineId()).getId(),
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SWAP,
                 request.getMachineId(), machineCode,
@@ -503,6 +512,7 @@ public class MachineDisplayService {
         trulyPrevious.add(outgoingProductName);
         emitDisplayNotification(
                 NotificationType.DISPLAY_SWAP,
+                request.getMachineId(),
                 request.getActorId(),
                 OffsetDateTime.now(),
                 List.of(new MachineSnapshot(machineCode, trulyPrevious, currentNames))
@@ -814,6 +824,7 @@ public class MachineDisplayService {
 
             // Create the audit log entry
             AuditLog auditLog = auditLogService.createAuditLog(
+                    resolveMachineSite(request.getMachineId()).getId(),
                     request.getActorId(),
                     StockMovementReason.DISPLAY_SWAP,
                     request.getMachineId(), sourceMachineCode,
@@ -859,6 +870,7 @@ public class MachineDisplayService {
             }
             emitDisplayNotification(
                     NotificationType.DISPLAY_SWAP,
+                    request.getMachineId(),
                     request.getActorId(),
                     now,
                     snapshots
@@ -925,6 +937,7 @@ public class MachineDisplayService {
         // Create audit log
         String machineCode = resolveLocationCode(request.getMachineId(), request.getLocationType());
         AuditLog auditLog = auditLogService.createAuditLog(
+                resolveMachineSite(request.getMachineId()).getId(),
                 request.getActorId(),
                 StockMovementReason.DISPLAY_SWAP, // Reuse DISPLAY_SWAP for renewal
                 request.getMachineId(), machineCode,
@@ -955,6 +968,7 @@ public class MachineDisplayService {
 
         emitDisplayNotification(
                 NotificationType.DISPLAY_RENEWED,
+                request.getMachineId(),
                 request.getActorId(),
                 now,
                 List.of(new MachineSnapshot(machineCode, productNames, productNames))
@@ -1403,6 +1417,7 @@ public class MachineDisplayService {
      */
     private void emitDisplayNotification(
             NotificationType type,
+            UUID machineId,
             UUID actorId,
             OffsetDateTime occurredAt,
             List<MachineSnapshot> machines
@@ -1419,6 +1434,7 @@ public class MachineDisplayService {
                     .collect(Collectors.joining(separator));
 
             Notification notif = Notification.builder()
+                    .siteId(resolveMachineSite(machineId).getId())
                     .type(type)
                     .severity(NotificationSeverity.INFO)
                     .message("Display " + actionLabel(type) + " on " + (summary.isEmpty() ? "—" : summary))

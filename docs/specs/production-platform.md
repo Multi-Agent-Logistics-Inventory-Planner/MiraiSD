@@ -56,6 +56,18 @@ Secrets never enter Git, images, client bundles or build logs. Initially they MA
 protected CI environment and a root-restricted production environment file. Rotation and emergency
 revocation are documented.
 
+### Host registry credential
+
+The Hetzner host pulls images from GHCR with a classic personal access token named
+`hetzner-ghcr-pull`, scope `read:packages` only, saved by `docker login ghcr.io` on the host. It
+cannot push or read code. When it expires, `docker compose pull` fails with `denied` and every
+deploy stops after the scans.
+
+- Rotate: create a new classic token with `read:packages`, authorize it for the org if SSO is on,
+  then run `docker login ghcr.io -u <user> --password-stdin` on the host.
+- Revoke: delete the token in GitHub settings, then log out of `ghcr.io` on the host.
+- Expiry: current token expires 2027-01-13. Rotate by 2026-12-30 and record the new date here.
+
 SOPS or another encrypted-configuration system becomes appropriate when multiple hosts/operators or
 manual secret distribution creates material risk.
 

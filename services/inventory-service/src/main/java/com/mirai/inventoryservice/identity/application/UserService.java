@@ -12,10 +12,13 @@ import org.springframework.stereotype.Service;
 
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional
@@ -54,6 +57,29 @@ public class UserService {
                 .orElseThrow(() -> new UserNotFoundException("User not found with id: " + id));
     }
 
+    public List<User> findActiveSiteMembers(UUID siteId) {
+        return userRepository.findActiveSiteMembers(siteId);
+    }
+
+    public List<User> findTrackedSiteMembers(UUID siteId) {
+        return userRepository.findTrackedActiveSiteMembers(siteId);
+    }
+
+    /** A user with any membership row at the site, including a deactivated one (read paths). */
+    public Optional<User> findSiteMember(UUID siteId, UUID userId) {
+        return userRepository.findSiteMember(siteId, userId);
+    }
+
+    /** A user with an active membership at the site (write paths). */
+    public Optional<User> findActiveSiteMember(UUID siteId, UUID userId) {
+        return userRepository.findActiveSiteMember(siteId, userId);
+    }
+
+    @Transactional
+    public User save(User user) {
+        return userRepository.save(user);
+    }
+
     /**
      * Tolerant variant of {@link #getUserById(UUID)} for callers that treat a missing/invalid id
      * as "no actor", not an error (e.g. an optional {@code receivedBy}/{@code createdBy} on a
@@ -79,10 +105,6 @@ public class UserService {
     public User getUserByFullName(String fullName) {
         return userRepository.findByFullName(fullName)
                 .orElseThrow(() -> new UserNotFoundException("User not found with fullName: " + fullName));
-    }
-
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
     }
 
     public User updateUser(UUID id, String fullName, String email, UserRole role) {
@@ -245,12 +267,22 @@ public class UserService {
         return parts[0];
     }
 
-    public Optional<OffsetDateTime> getLastAuditDate(UUID userId) {
-        return lastActorActivityPort.lastActivityFor(userId);
+    public Optional<OffsetDateTime> getLastAuditDate(UUID siteId, UUID userId) {
+        return lastActorActivityPort.lastActivityFor(siteId, userId);
     }
 
-    public Map<UUID, OffsetDateTime> getAllLastAuditDates() {
-        return lastActorActivityPort.lastActivityByActor();
+    /** Latest movement time per active member of the site, counting only movements at that site. */
+    public Map<UUID, OffsetDateTime> getSiteLastAuditDates(UUID siteId) {
+        Set<UUID> memberIds = userRepository.findActiveSiteMembers(siteId).stream()
+                .map(User::getId)
+                .collect(Collectors.toSet());
+        Map<UUID, OffsetDateTime> byMember = new HashMap<>();
+        lastActorActivityPort.lastActivityByActor(siteId).forEach((actorId, at) -> {
+            if (memberIds.contains(actorId)) {
+                byMember.put(actorId, at);
+            }
+        });
+        return byMember;
     }
 }
 

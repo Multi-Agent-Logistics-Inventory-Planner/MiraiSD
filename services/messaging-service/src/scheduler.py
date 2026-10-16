@@ -120,6 +120,7 @@ def daily_stale_display_check_job() -> None:
                 machine_id=display["machine_id"],
                 location_type=display["location_type"],
                 days_active=display["days_active"],
+                site_id=display.get("site_id"),
             )
             if notification_id:
                 created_count += 1

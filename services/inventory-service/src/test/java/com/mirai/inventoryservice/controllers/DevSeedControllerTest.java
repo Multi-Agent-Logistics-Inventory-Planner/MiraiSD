@@ -28,6 +28,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class DevSeedControllerTest {
     private static final String ADMIN_EMAIL = "jjmatu16@yahoo.com";
     private static final String EMPLOYEE_EMAIL = "mjpark019@gmail.com";
@@ -37,6 +38,9 @@ class DevSeedControllerTest {
     @Mock SiteRepository siteRepository;
     @Mock StorageLocationRepository storageLocationRepository;
     @Mock LocationRepository locationRepository;
+    @Mock com.mirai.inventoryservice.sites.application.SiteDirectory siteDirectory;
+    @Mock com.mirai.inventoryservice.reviews.infrastructure.ReviewRepository reviewRepository;
+    @Mock com.mirai.inventoryservice.reviews.infrastructure.ReviewDailyCountRepository reviewDailyCountRepository;
     @InjectMocks DevSeedController controller;
     private final Map<String, User> users = new HashMap<>();
 
@@ -88,5 +92,21 @@ class DevSeedControllerTest {
         assertEquals("Existing Name", existing.getFullName());
         assertEquals(2, users.size());
         verify(membershipAuthorizer, times(2)).grantMainSiteMembershipIfAbsent(id);
+    }
+
+    @Test
+    void seededReviewsCarryTheMainSite() {
+        UUID mainId = UUID.randomUUID();
+        when(siteDirectory.findByCode("MAIN")).thenReturn(Optional.of(
+                new com.mirai.inventoryservice.sites.application.SiteSummary(mainId, "Main", "MAIN")));
+
+        controller.seedReviews();
+
+        @SuppressWarnings("unchecked")
+        org.mockito.ArgumentCaptor<java.util.List<com.mirai.inventoryservice.reviews.domain.Review>> saved =
+                org.mockito.ArgumentCaptor.forClass(java.util.List.class);
+        verify(reviewRepository).saveAll(saved.capture());
+        assertFalse(saved.getValue().isEmpty());
+        assertTrue(saved.getValue().stream().allMatch(r -> mainId.equals(r.getSiteId())));
     }
 }

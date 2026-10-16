@@ -53,7 +53,7 @@ class InventoryOperationsCallerSetTest {
         expected.add("com.mirai.inventoryservice.services.ProductReportBundleService");
         expected.add("com.mirai.inventoryservice.services.ForecastService");
         expected.add("com.mirai.inventoryservice.services.AnalyticsService");
-        expected.add("com.mirai.inventoryservice.services.AuditLogService");
+        expected.add("com.mirai.inventoryservice.audit.application.AuditLogService");
         expected.add("com.mirai.inventoryservice.analytics.application.SalesRollupRecomputeService");
         return expected;
     }

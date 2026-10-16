@@ -5,7 +5,7 @@ import com.mirai.inventoryservice.catalog.domain.Category;
 import com.mirai.inventoryservice.catalog.domain.Product;
 import com.mirai.inventoryservice.catalog.infrastructure.CategoryRepository;
 import com.mirai.inventoryservice.catalog.infrastructure.ProductRepository;
-import com.mirai.inventoryservice.models.audit.AuditLog;
+import com.mirai.inventoryservice.audit.domain.AuditLog;
 import com.mirai.inventoryservice.inventory.domain.StockMovement;
 import com.mirai.inventoryservice.inventory.infrastructure.StockMovementRepository;
 import com.mirai.inventoryservice.models.enums.KujiBoxStatus;
@@ -27,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import com.mirai.inventoryservice.audit.infrastructure.AuditLogRepository;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.HashMap;

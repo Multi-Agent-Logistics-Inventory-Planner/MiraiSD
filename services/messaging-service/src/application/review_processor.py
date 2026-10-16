@@ -129,6 +129,10 @@ class ReviewProcessor:
         # Parse review date
         review_date = date.fromisoformat(event.published_at.split("T")[0])
 
+        # Resolve the site once: the event carries it; only events queued before the
+        # field existed need the lookup.
+        site_id = event.site_id or self._repo.get_review_site_id()
+
         # Store the individual review
         review_id = self._repo.create_review(
             employee_name=employee,
@@ -137,6 +141,7 @@ class ReviewProcessor:
             review_text=event.review_text,
             rating=event.rating,
             reviewer_name=event.reviewer_name,
+            site_id=site_id,
         )
 
         if review_id:
@@ -147,10 +152,7 @@ class ReviewProcessor:
                 review_date,
             )
 
-            # Update daily count, applying the rate and site that traveled with
-            # this event. Fall back to resolving the site here only for events
-            # queued before the site_id field existed.
-            site_id = event.site_id or self._repo.get_review_site_id()
+            # Update daily count, applying the rate and site that traveled with this event.
             self._repo.increment_daily_count(employee, review_date, site_id, rate=event.coin_rate)
             return True
 

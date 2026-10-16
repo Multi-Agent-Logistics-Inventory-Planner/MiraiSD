@@ -1,11 +1,14 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getUsers } from "@/lib/api/users";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { getSiteUsers } from "@/lib/api/site-users";
 
 export function useUsers() {
+  const { siteId } = useCurrentSite();
+
   return useQuery({
-    queryKey: ["users"],
-    queryFn: getUsers,
+    queryKey: ["users", "site", siteId],
+    queryFn: siteId ? () => getSiteUsers(siteId) : skipToken,
   });
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getAllUsersForReviewManagement } from "@/lib/api/reviews";
+import { useQuery, skipToken } from "@tanstack/react-query";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { getSiteAllUsersForReviewManagement } from "@/lib/api/site-reviews";
 import { StatStrip } from "@/components/lootbox/admin/coins/stat-strip";
 import { PlayerBalancesSection } from "@/components/lootbox/admin/coins/player-balances-section";
 import { RecentActivitySection } from "@/components/lootbox/admin/coins/recent-activity-section";
@@ -14,9 +15,10 @@ interface CoinsTabProps {
 export function CoinsTab({ onViewAllActivity }: CoinsTabProps) {
   // The grant-dialog user pool reuses the existing review-management query so we
   // don't fan out a second "list all employees" endpoint.
+  const { siteId } = useCurrentSite();
   const usersQuery = useQuery({
-    queryKey: ["users", "all"],
-    queryFn: getAllUsersForReviewManagement,
+    queryKey: ["users", "all", siteId],
+    queryFn: siteId ? () => getSiteAllUsersForReviewManagement(siteId) : skipToken,
     staleTime: 60_000,
   });
 

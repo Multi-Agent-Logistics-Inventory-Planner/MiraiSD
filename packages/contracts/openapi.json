@@ -7228,661 +7228,6 @@
         "tags" : [ "machine-display-controller" ]
       }
     },
-    "/api/notifications" : {
-      "get" : {
-        "operationId" : "getAllNotifications",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "recipientId",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        }, {
-          "in" : "query",
-          "name" : "pageable",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageNotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/counts" : {
-      "get" : {
-        "operationId" : "getNotificationCounts",
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "object",
-                  "additionalProperties" : {
-                    "type" : "integer",
-                    "format" : "int64"
-                  }
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/read-all" : {
-      "put" : {
-        "operationId" : "markAllAsRead",
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/search" : {
-      "get" : {
-        "operationId" : "searchNotifications",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "search",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        }, {
-          "in" : "query",
-          "name" : "type",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "enum" : [ "LOW_STOCK", "OUT_OF_STOCK", "REORDER_SUGGESTION", "EXPIRY_WARNING", "SYSTEM_ALERT", "SHIPMENT_COMPLETED", "SHIPMENT_DAMAGED", "SHIPMENT_DELIVERY_FAILED", "PACKAGE_ARRIVED", "DISPLAY_STALE", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "DISPLAY_RENEWED", "KUJI_PRIZE_DRAWN", "KUJI_PRIZE_DRAW_UNDONE" ]
-          }
-        }, {
-          "in" : "query",
-          "name" : "resolved",
-          "required" : false,
-          "schema" : {
-            "type" : "boolean"
-          }
-        }, {
-          "in" : "query",
-          "name" : "fromDate",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }, {
-          "in" : "query",
-          "name" : "toDate",
-          "required" : false,
-          "schema" : {
-            "type" : "string",
-            "format" : "date-time"
-          }
-        }, {
-          "in" : "query",
-          "name" : "pageable",
-          "required" : true,
-          "schema" : {
-            "$ref" : "#/components/schemas/Pageable"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/PageNotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/unread" : {
-      "get" : {
-        "operationId" : "getUnreadNotifications",
-        "parameters" : [ {
-          "in" : "query",
-          "name" : "recipientId",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "type" : "array",
-                  "items" : {
-                    "$ref" : "#/components/schemas/NotificationResponseDTO"
-                  }
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/{id}" : {
-      "delete" : {
-        "operationId" : "deleteNotification",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      },
-      "get" : {
-        "operationId" : "getNotificationById",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/NotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/{id}/mark-read" : {
-      "put" : {
-        "operationId" : "markAsUserRead",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/NotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/{id}/read" : {
-      "put" : {
-        "operationId" : "markAsRead",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/NotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/{id}/resolve" : {
-      "put" : {
-        "operationId" : "resolveNotification",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/NotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
-    "/api/notifications/{id}/unresolve" : {
-      "put" : {
-        "operationId" : "unresolveNotification",
-        "parameters" : [ {
-          "in" : "path",
-          "name" : "id",
-          "required" : true,
-          "schema" : {
-            "type" : "string",
-            "format" : "uuid"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "content" : {
-              "*/*" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/NotificationResponseDTO"
-                }
-              }
-            },
-            "description" : "OK"
-          },
-          "401" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Authentication required"
-          },
-          "403" : {
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "properties" : {
-                    "error" : { },
-                    "message" : { },
-                    "status" : { }
-                  }
-                }
-              }
-            },
-            "description" : "Insufficient permissions"
-          }
-        },
-        "security" : [ {
-          "bearerAuth" : [ ]
-        } ],
-        "tags" : [ "notification-controller" ]
-      }
-    },
     "/api/products" : {
       "get" : {
         "operationId" : "getAllProducts",
@@ -8602,7 +7947,7 @@
                 "schema" : {
                   "type" : "array",
                   "items" : {
-                    "$ref" : "#/components/schemas/UserResponseDTO"
+                    "$ref" : "#/components/schemas/ReviewUserDTO"
                   }
                 }
               }
@@ -8654,7 +7999,7 @@
                 "schema" : {
                   "type" : "array",
                   "items" : {
-                    "$ref" : "#/components/schemas/UserResponseDTO"
+                    "$ref" : "#/components/schemas/ReviewUserDTO"
                   }
                 }
               }
@@ -8713,7 +8058,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/UserResponseDTO"
+                  "$ref" : "#/components/schemas/ReviewUserDTO"
                 }
               }
             },
@@ -8781,7 +8126,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/UserResponseDTO"
+                  "$ref" : "#/components/schemas/ReviewUserDTO"
                 }
               }
             },
@@ -12939,6 +12284,214 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "me-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/audit-logs" : {
+      "get" : {
+        "operationId" : "listSiteAuditLogs",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        }, {
+          "in" : "query",
+          "name" : "search",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "actorId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "reason",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "INITIAL_STOCK", "RESTOCK", "SHIPMENT_RECEIPT", "SHIPMENT_RECEIPT_REVERSED", "SHIPMENT_PARTIAL_RECEIPT", "SHIPMENT_EDITED", "SHIPMENT_DELETED", "SHIPMENT_STATUS_OVERRIDDEN", "SALE", "DAMAGE", "ADJUSTMENT", "RETURN", "TRANSFER", "REMOVED", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "KUJI_PRIZE_WON", "KUJI_DRAW_REVERSED", "KUJI_SLIP_ADJUSTMENT", "COIN_RATE_CHANGED" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "reasons",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "INITIAL_STOCK", "RESTOCK", "SHIPMENT_RECEIPT", "SHIPMENT_RECEIPT_REVERSED", "SHIPMENT_PARTIAL_RECEIPT", "SHIPMENT_EDITED", "SHIPMENT_DELETED", "SHIPMENT_STATUS_OVERRIDDEN", "SALE", "DAMAGE", "ADJUSTMENT", "RETURN", "TRANSFER", "REMOVED", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "KUJI_PRIZE_WON", "KUJI_DRAW_REVERSED", "KUJI_SLIP_ADJUSTMENT", "COIN_RATE_CHANGED" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "fromDate",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "in" : "query",
+          "name" : "toDate",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "in" : "query",
+          "name" : "productId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "locationId",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageAuditLogDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-audit-log-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/audit-logs/{id}" : {
+      "get" : {
+        "operationId" : "getSiteAuditLogDetail",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/AuditLogDetailDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-audit-log-controller" ]
       }
     },
     "/api/v1/sites/{siteId}/inventory/adjustments" : {
@@ -18853,6 +18406,529 @@
         "tags" : [ "site-product-controller" ]
       }
     },
+    "/api/v1/sites/{siteId}/reviews/summaries" : {
+      "get" : {
+        "operationId" : "getSiteMonthlySummaries",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "year",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "month",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ReviewSummaryResponseDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/reviews/users/all" : {
+      "get" : {
+        "operationId" : "getSiteUsersForReviewManagement",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ReviewUserDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/reviews/users/tracked" : {
+      "get" : {
+        "operationId" : "getSiteReviewTrackedUsers",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ReviewUserDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/reviews/users/{userId}" : {
+      "get" : {
+        "operationId" : "getSiteUserForReviewTracking",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReviewUserDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/reviews/users/{userId}/reviews" : {
+      "get" : {
+        "operationId" : "getSiteUserReviews",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "fromDate",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "in" : "query",
+          "name" : "toDate",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 0
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/PageReviewResponseDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/reviews/users/{userId}/stats" : {
+      "get" : {
+        "operationId" : "getSiteUserReviewStats",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "query",
+          "name" : "year",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "in" : "query",
+          "name" : "month",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/UserReviewStatsResponseDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/reviews/users/{userId}/tracking" : {
+      "put" : {
+        "operationId" : "updateSiteUserReviewTracking",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UserReviewTrackingRequestDTO"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ReviewUserDTO"
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-review-controller" ]
+      }
+    },
     "/api/v1/sites/{siteId}/shipments" : {
       "get" : {
         "operationId" : "listSiteShipments",
@@ -20040,6 +20116,129 @@
           "bearerAuth" : [ ]
         } ],
         "tags" : [ "site-tracking-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/users" : {
+      "get" : {
+        "operationId" : "getSiteUsers",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/UserResponseDTO"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-user-controller" ]
+      }
+    },
+    "/api/v1/sites/{siteId}/users/last-audits" : {
+      "get" : {
+        "operationId" : "getSiteLastAudits",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object",
+                  "additionalProperties" : {
+                    "type" : "string",
+                    "format" : "date-time"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          },
+          "401" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Authentication required"
+          },
+          "403" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "properties" : {
+                    "error" : { },
+                    "message" : { },
+                    "status" : { }
+                  }
+                }
+              }
+            },
+            "description" : "Insufficient permissions"
+          }
+        },
+        "security" : [ {
+          "bearerAuth" : [ ]
+        } ],
+        "tags" : [ "site-user-controller" ]
       }
     },
     "/api/v1/webhooks/easypost" : {
@@ -22856,69 +23055,6 @@
         },
         "required" : [ "activeCount" ]
       },
-      "NotificationResponseDTO" : {
-        "type" : "object",
-        "properties" : {
-          "createdAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "deliveredAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "id" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "inventoryId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "itemId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "itemName" : {
-            "type" : "string"
-          },
-          "message" : {
-            "type" : "string"
-          },
-          "metadata" : {
-            "type" : "object",
-            "additionalProperties" : {
-              "type" : "object"
-            }
-          },
-          "readAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "recipientId" : {
-            "type" : "string",
-            "format" : "uuid"
-          },
-          "resolvedAt" : {
-            "type" : "string",
-            "format" : "date-time"
-          },
-          "severity" : {
-            "type" : "string",
-            "enum" : [ "INFO", "WARNING", "CRITICAL" ]
-          },
-          "type" : {
-            "type" : "string",
-            "enum" : [ "LOW_STOCK", "OUT_OF_STOCK", "REORDER_SUGGESTION", "EXPIRY_WARNING", "SYSTEM_ALERT", "SHIPMENT_COMPLETED", "SHIPMENT_DAMAGED", "SHIPMENT_DELIVERY_FAILED", "PACKAGE_ARRIVED", "DISPLAY_STALE", "DISPLAY_SET", "DISPLAY_REMOVED", "DISPLAY_SWAP", "DISPLAY_RENEWED", "KUJI_PRIZE_DRAWN", "KUJI_PRIZE_DRAW_UNDONE" ]
-          },
-          "via" : {
-            "type" : "array",
-            "items" : {
-              "type" : "string"
-            }
-          }
-        }
-      },
       "OpenKujiBoxRequestDTO" : {
         "type" : "object",
         "properties" : {
@@ -23147,52 +23283,6 @@
             "type" : "array",
             "items" : {
               "$ref" : "#/components/schemas/MachineDisplayDTO"
-            }
-          },
-          "empty" : {
-            "type" : "boolean"
-          },
-          "first" : {
-            "type" : "boolean"
-          },
-          "last" : {
-            "type" : "boolean"
-          },
-          "number" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "numberOfElements" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "pageable" : {
-            "$ref" : "#/components/schemas/PageableObject"
-          },
-          "size" : {
-            "type" : "integer",
-            "format" : "int32"
-          },
-          "sort" : {
-            "$ref" : "#/components/schemas/SortObject"
-          },
-          "totalElements" : {
-            "type" : "integer",
-            "format" : "int64"
-          },
-          "totalPages" : {
-            "type" : "integer",
-            "format" : "int32"
-          }
-        }
-      },
-      "PageNotificationResponseDTO" : {
-        "type" : "object",
-        "properties" : {
-          "content" : {
-            "type" : "array",
-            "items" : {
-              "$ref" : "#/components/schemas/NotificationResponseDTO"
             }
           },
           "empty" : {
@@ -24212,6 +24302,45 @@
           },
           "userName" : {
             "type" : "string"
+          }
+        }
+      },
+      "ReviewUserDTO" : {
+        "type" : "object",
+        "properties" : {
+          "canonicalName" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "fullName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "isReviewTracked" : {
+            "type" : "boolean"
+          },
+          "nameVariants" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "role" : {
+            "type" : "string",
+            "enum" : [ "ADMIN", "ASSISTANT_MANAGER", "EMPLOYEE" ]
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },
@@ -25531,7 +25660,9 @@
         "type" : "object",
         "properties" : {
           "canonicalName" : {
-            "type" : "string"
+            "type" : "string",
+            "maxLength" : 100,
+            "minLength" : 0
           },
           "isReviewTracked" : {
             "type" : "boolean"
@@ -25539,8 +25670,12 @@
           "nameVariants" : {
             "type" : "array",
             "items" : {
-              "type" : "string"
-            }
+              "type" : "string",
+              "maxLength" : 100,
+              "minLength" : 0
+            },
+            "maxItems" : 50,
+            "minItems" : 0
           }
         }
       },

@@ -14,7 +14,8 @@ import {
   ChevronRight,
   Star,
 } from "lucide-react";
-import { getUserReviewStats, getUserReviews } from "@/lib/api/reviews";
+import { getSiteUserReviewStats, getSiteUserReviews } from "@/lib/api/site-reviews";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
 import type { UserReviewStats, Review, PaginatedResponse } from "@/types/api";
 
 interface UserStatsDialogProps {
@@ -107,21 +108,23 @@ export function UserStatsDialog({
   const [isLoadingReviews, setIsLoadingReviews] = useState(false);
   const [reviewPage, setReviewPage] = useState(0);
 
+  const { siteId } = useCurrentSite();
+
   const fetchStats = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !siteId) return;
     setIsLoadingStats(true);
     try {
-      const data = await getUserReviewStats(userId, selectedYear, selectedMonth);
+      const data = await getSiteUserReviewStats(siteId, userId, selectedYear, selectedMonth);
       setStats(data);
     } catch (error) {
       console.error("Failed to fetch user stats:", error);
     } finally {
       setIsLoadingStats(false);
     }
-  }, [userId, selectedYear, selectedMonth]);
+  }, [siteId, userId, selectedYear, selectedMonth]);
 
   const fetchReviews = useCallback(async () => {
-    if (!userId) return;
+    if (!userId || !siteId) return;
     setIsLoadingReviews(true);
     try {
       // Calculate first and last day of selected month
@@ -129,7 +132,7 @@ export function UserStatsDialog({
       const lastDay = new Date(selectedYear, selectedMonth, 0).getDate();
       const toDate = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
 
-      const data = await getUserReviews(userId, {
+      const data = await getSiteUserReviews(siteId, userId, {
         page: reviewPage,
         size: REVIEWS_PER_PAGE,
         fromDate,
@@ -141,7 +144,7 @@ export function UserStatsDialog({
     } finally {
       setIsLoadingReviews(false);
     }
-  }, [userId, reviewPage, selectedYear, selectedMonth]);
+  }, [siteId, userId, reviewPage, selectedYear, selectedMonth]);
 
   useEffect(() => {
     if (open && userId) {

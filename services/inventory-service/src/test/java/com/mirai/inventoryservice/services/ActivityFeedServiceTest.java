@@ -1,6 +1,6 @@
 package com.mirai.inventoryservice.services;
 
-import com.mirai.inventoryservice.repositories.AuditLogRepository;
+import com.mirai.inventoryservice.audit.application.AuditLogService;
 import com.mirai.inventoryservice.repositories.NotificationRepository;
 import com.mirai.inventoryservice.shipments.infrastructure.ShipmentRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 import java.util.UUID;
 
+import java.time.OffsetDateTime;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -27,14 +29,13 @@ import static org.mockito.Mockito.*;
  * {@code ActivityFeedController} had no site resolution at all -- any authenticated user, with
  * zero site memberships, could see every site's shipment activity. Proves the fix: the shipment
  * portion now goes through the site-scoped {@code findByStatusPaged} with the caller's site.
- * Audit-log and notification reads stay unscoped here (those entities carry no {@code site_id}
- * yet -- notifications-reviews-audit slice's responsibility, not this one's).
+ * Audit-log and notification reads are site-scoped too (notifications-reviews-audit slice).
  */
 @ExtendWith(MockitoExtension.class)
 class ActivityFeedServiceTest {
 
     @Mock
-    private AuditLogRepository auditLogRepository;
+    private AuditLogService auditLogService;
     @Mock
     private ShipmentRepository shipmentRepository;
     @Mock
@@ -47,7 +48,7 @@ class ActivityFeedServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(shipmentRepository.findByStatusPaged(isNull(), eq(siteId), any(Pageable.class)))
+        lenient().when(shipmentRepository.findByStatusPaged(isNull(), eq(siteId), any(Pageable.class)))
                 .thenReturn(Page.empty());
     }
 
@@ -58,5 +59,61 @@ class ActivityFeedServiceTest {
         ArgumentCaptor<UUID> siteCaptor = ArgumentCaptor.forClass(UUID.class);
         verify(shipmentRepository).findByStatusPaged(isNull(), siteCaptor.capture(), any(Pageable.class));
         org.assertj.core.api.Assertions.assertThat(siteCaptor.getValue()).isEqualTo(siteId);
+    }
+
+    @Test
+    void auditLogReadIsScopedToTheCallersSite() {
+        when(auditLogService.findRecent(
+                eq(siteId), any(OffsetDateTime.class), any(OffsetDateTime.class), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        activityFeedService.getActivityFeed(siteId, 50, List.of("restock"), false);
+
+        verify(auditLogService).findRecent(
+                eq(siteId), any(OffsetDateTime.class), any(OffsetDateTime.class), any(Pageable.class));
+    }
+
+    @Test
+    void unresolvedNotificationReadIsScopedToTheCallersSite() {
+        when(notificationRepository.findUnresolvedBySiteIdOrderByCreatedAtDesc(eq(siteId), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        activityFeedService.getActivityFeed(siteId, 50, List.of("alert"), false);
+
+        verify(notificationRepository).findUnresolvedBySiteIdOrderByCreatedAtDesc(eq(siteId), any(Pageable.class));
+    }
+
+    @Test
+    void allNotificationReadIsScopedToTheCallersSite() {
+        when(notificationRepository.findBySiteIdOrderByCreatedAtDesc(eq(siteId), any(Pageable.class)))
+                .thenReturn(Page.empty());
+
+        activityFeedService.getActivityFeed(siteId, 50, List.of("alert"), true);
+
+        verify(notificationRepository).findBySiteIdOrderByCreatedAtDesc(eq(siteId), any(Pageable.class));
+    }
+
+    @Test
+    void movementsFromAnotherSiteAreDroppedFromAMixedAuditLog() {
+        var product = com.mirai.inventoryservice.catalog.domain.Product.builder()
+                .id(UUID.randomUUID()).name("Plush").build();
+        var own = com.mirai.inventoryservice.inventory.domain.StockMovement.builder()
+                .id(1L).reason(com.mirai.inventoryservice.models.enums.StockMovementReason.SALE)
+                .quantityChange(-1).item(product)
+                .site(com.mirai.inventoryservice.sites.domain.Site.builder().id(siteId).build()).build();
+        var foreign = com.mirai.inventoryservice.inventory.domain.StockMovement.builder()
+                .id(2L).reason(com.mirai.inventoryservice.models.enums.StockMovementReason.SALE)
+                .quantityChange(-1).item(product)
+                .site(com.mirai.inventoryservice.sites.domain.Site.builder().id(UUID.randomUUID()).build()).build();
+        var log = com.mirai.inventoryservice.audit.domain.AuditLog.builder()
+                .id(UUID.randomUUID()).siteId(siteId).createdAt(OffsetDateTime.now())
+                .movements(new java.util.ArrayList<>(List.of(own, foreign))).build();
+        when(auditLogService.findRecent(
+                eq(siteId), any(OffsetDateTime.class), any(OffsetDateTime.class), any(Pageable.class)))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(log)));
+
+        var events = activityFeedService.getActivityFeed(siteId, 50, List.of("sale"), false);
+
+        org.assertj.core.api.Assertions.assertThat(events).extracting("id").containsExactly("audit-1");
     }
 }

@@ -65,8 +65,8 @@ public class InventoryQueries {
         return inventoryTotalsRepository.findAllInventoryTotals();
     }
 
-    public List<StockMovement> findByAuditLogIdWithItem(UUID auditLogId) {
-        return stockMovementRepository.findByAuditLogIdWithItem(auditLogId);
+    public List<StockMovement> findByAuditLogIdWithItem(UUID auditLogId, UUID siteId) {
+        return stockMovementRepository.findByAuditLogIdWithItem(auditLogId, siteId);
     }
 
     /**
