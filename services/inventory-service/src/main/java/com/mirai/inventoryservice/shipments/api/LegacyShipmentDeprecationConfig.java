@@ -3,6 +3,7 @@ package com.mirai.inventoryservice.shipments.api;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.Ordered;
 
 /**
  * Registers {@link LegacyShipmentDeprecationFilter} only for the legacy shipment/tracking/webhook
@@ -23,6 +24,8 @@ public class LegacyShipmentDeprecationConfig {
         registration.addUrlPatterns(
                 "/api/shipments", "/api/shipments/*", "/api/tracking/*", "/api/webhooks/*");
         registration.setName("legacyShipmentDeprecationFilter");
+        // Must run before the security chain so 401/403 rejections carry the headers.
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return registration;
     }
 }

@@ -51,4 +51,13 @@ class LegacyReviewDeprecationHeadersIT extends BaseIntegrationTest {
                 .andExpect(header().doesNotExist("Deprecation"))
                 .andExpect(header().doesNotExist("Link"));
     }
+
+    @Test
+    @DisplayName("legacy routes carry deprecation headers on authentication failures")
+    void legacyRoutes_deprecationHeadersOnAuthFailures() throws Exception {
+        mockMvc.perform(get("/api/reviews/users/tracked"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().exists("Deprecation"))
+                .andExpect(header().exists("Link"));
+    }
 }

@@ -25,3 +25,4 @@
 - Finding (P2): the filter ran after Spring Security, so an unauthenticated `GET /api/users` returned 401 without `Deprecation`/`Link` (AC-3).
 - Test first: `legacyRoutes_deprecationHeadersOnAuthFailures` (no token, invalid token) failed, then passed after `LegacyUserDeprecationConfig` set `Ordered.HIGHEST_PRECEDENCE`.
 - Follow-up, not changed here: the shipment, catalog, machine-display, audit, inventory and review deprecation configs register their filters without an order and have the same gap on 401 responses.
+- Follow-up done: the six other legacy deprecation configs (shipment, catalog, machine-display, audit, inventory with both registrations, review) now set `Ordered.HIGHEST_PRECEDENCE`. Each IT gained an auth-failure test that failed first. Full backend suite: 1205 tests, 0 failures.
