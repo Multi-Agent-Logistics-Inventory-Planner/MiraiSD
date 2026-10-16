@@ -21,9 +21,9 @@ import java.util.UUID;
  */
 public interface LastActorActivityPort {
 
-    /** The timestamp of {@code actorId}'s most recent stock movement, if any. */
-    Optional<OffsetDateTime> lastActivityFor(UUID actorId);
+    /** The timestamp of {@code actorId}'s most recent stock movement at {@code siteId}, if any. */
+    Optional<OffsetDateTime> lastActivityFor(UUID siteId, UUID actorId);
 
-    /** The most recent stock-movement timestamp for every actor that has one. */
-    Map<UUID, OffsetDateTime> lastActivityByActor();
+    /** The most recent stock-movement timestamp at {@code siteId} for every actor that has one there. */
+    Map<UUID, OffsetDateTime> lastActivityByActor(UUID siteId);
 }

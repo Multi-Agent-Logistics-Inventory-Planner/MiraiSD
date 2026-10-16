@@ -28,15 +28,15 @@ class LastActorActivityAdapter implements LastActorActivityPort {
 
     @Override
     @Transactional(readOnly = true)
-    public Optional<OffsetDateTime> lastActivityFor(UUID actorId) {
-        return stockMovementRepository.findTopByActorIdOrderByAtDesc(actorId)
+    public Optional<OffsetDateTime> lastActivityFor(UUID siteId, UUID actorId) {
+        return stockMovementRepository.findTopBySite_IdAndActorIdOrderByAtDesc(siteId, actorId)
                 .map(StockMovement::getAt);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Map<UUID, OffsetDateTime> lastActivityByActor() {
-        List<Object[]> results = stockMovementRepository.findLatestMovementTimestampsByActor();
+    public Map<UUID, OffsetDateTime> lastActivityByActor(UUID siteId) {
+        List<Object[]> results = stockMovementRepository.findLatestMovementTimestampsByActor(siteId);
         Map<UUID, OffsetDateTime> map = new HashMap<>();
         for (Object[] row : results) {
             UUID actorId = (UUID) row[0];

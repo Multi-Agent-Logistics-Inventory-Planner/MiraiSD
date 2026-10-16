@@ -50,7 +50,7 @@ class UserControllerSecurityIT extends BaseIntegrationTest {
         @DisplayName("Should allow EMPLOYEE role to list users (read-only, see 62a52df)")
         void getAllUsers_employeeRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL)
-                            .header("Authorization", "Bearer " + employeeToken()))
+                            .header("Authorization", "Bearer " + employeeTokenWithMainMembership()))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
         }
@@ -59,7 +59,7 @@ class UserControllerSecurityIT extends BaseIntegrationTest {
         @DisplayName("Should allow ADMIN role to list users")
         void getAllUsers_adminRole_notForbidden() throws Exception {
             mockMvc.perform(get(BASE_URL)
-                            .header("Authorization", "Bearer " + adminToken()))
+                            .header("Authorization", "Bearer " + adminTokenWithMainMembership()))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(403))
                     .andExpect(result -> assertThat(result.getResponse().getStatus()).isNotEqualTo(401));
         }

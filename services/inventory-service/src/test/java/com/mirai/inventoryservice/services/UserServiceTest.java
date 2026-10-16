@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -192,33 +193,38 @@ class UserServiceTest {
     // the delegation, not stock-movement query logic (that lives in the port's adapter).
 
     @Test
-    void getLastAuditDate_DelegatesToPort() {
+    void getLastAuditDate_DelegatesToPortWithTheSite() {
+        UUID siteId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         OffsetDateTime lastActivity = OffsetDateTime.now();
-        when(lastActorActivityPort.lastActivityFor(userId)).thenReturn(Optional.of(lastActivity));
+        when(lastActorActivityPort.lastActivityFor(siteId, userId)).thenReturn(Optional.of(lastActivity));
 
-        Optional<OffsetDateTime> result = userService.getLastAuditDate(userId);
+        Optional<OffsetDateTime> result = userService.getLastAuditDate(siteId, userId);
 
         assertEquals(Optional.of(lastActivity), result);
     }
 
     @Test
     void getLastAuditDate_NoActivity_ReturnsEmpty() {
+        UUID siteId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
-        when(lastActorActivityPort.lastActivityFor(userId)).thenReturn(Optional.empty());
+        when(lastActorActivityPort.lastActivityFor(siteId, userId)).thenReturn(Optional.empty());
 
-        assertFalse(userService.getLastAuditDate(userId).isPresent());
+        assertFalse(userService.getLastAuditDate(siteId, userId).isPresent());
     }
 
     @Test
-    void getAllLastAuditDates_DelegatesToPort() {
-        UUID actorId = UUID.randomUUID();
+    void getSiteLastAuditDates_KeepsOnlyActiveMembersOfTheSite() {
+        UUID siteId = UUID.randomUUID();
+        UUID memberId = UUID.randomUUID();
+        UUID formerMemberId = UUID.randomUUID();
         OffsetDateTime lastActivity = OffsetDateTime.now();
-        Map<UUID, OffsetDateTime> activity = Map.of(actorId, lastActivity);
-        when(lastActorActivityPort.lastActivityByActor()).thenReturn(activity);
+        when(lastActorActivityPort.lastActivityByActor(siteId))
+                .thenReturn(Map.of(memberId, lastActivity, formerMemberId, lastActivity.minusDays(2)));
+        when(userRepository.findActiveSiteMembers(siteId)).thenReturn(List.of(userWithId(memberId)));
 
-        Map<UUID, OffsetDateTime> result = userService.getAllLastAuditDates();
+        Map<UUID, OffsetDateTime> result = userService.getSiteLastAuditDates(siteId);
 
-        assertEquals(activity, result);
+        assertEquals(Map.of(memberId, lastActivity), result);
     }
 }

@@ -110,6 +110,12 @@ explicit split. The route list is complete as of the capture date.
   stays on the inventory slice's deprecation path. `/api/notifications` gained no v1 equivalent
   and was deleted with its web code; the table stays as the Slack delivery queue (now carrying
   `site_id`).
+- Phase 7 team users (.specs/phase-7-team-users-scoping): `GET /api/v1/sites/{siteId}/users`
+  (active members of the site) and `GET /api/v1/sites/{siteId}/users/last-audits` (latest movement
+  time per member, counting only that site's movements) in `SiteUserController`. Legacy
+  `GET /api/users`, `/api/users/last-audits` and `/api/users/{id}/last-audit` now resolve MAIN and
+  carry Deprecation/Link headers. Lookups by id, email and name, the admin write routes and
+  pending invitations stay global; invitations carry no site yet.
 
 ## Compatibility removal gate
 

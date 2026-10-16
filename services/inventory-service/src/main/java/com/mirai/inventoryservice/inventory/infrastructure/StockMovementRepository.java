@@ -35,12 +35,11 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     // Find recent movements (last 30 days, etc)
     List<StockMovement> findByItem_IdAndAtAfterOrderByAtDesc(UUID productId, OffsetDateTime since);
 
-    // Find most recent movement by actor (user)
-    Optional<StockMovement> findTopByActorIdOrderByAtDesc(UUID actorId);
+    Optional<StockMovement> findTopBySite_IdAndActorIdOrderByAtDesc(UUID siteId, UUID actorId);
 
-    // Bulk query: find most recent movement timestamp for each actor
-    @Query("SELECT sm.actorId, MAX(sm.at) FROM StockMovement sm WHERE sm.actorId IS NOT NULL GROUP BY sm.actorId")
-    List<Object[]> findLatestMovementTimestampsByActor();
+    @Query("SELECT sm.actorId, MAX(sm.at) FROM StockMovement sm "
+            + "WHERE sm.site.id = :siteId AND sm.actorId IS NOT NULL GROUP BY sm.actorId")
+    List<Object[]> findLatestMovementTimestampsByActor(@Param("siteId") UUID siteId);
 
     // Audit log query with eager fetch of item to avoid N+1
     @EntityGraph(value = "StockMovement.withItem")

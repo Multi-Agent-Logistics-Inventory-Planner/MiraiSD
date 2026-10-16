@@ -4,13 +4,6 @@ import { User, UserRequest } from "@/types/api";
 const BASE_PATH = "/api/users";
 
 /**
- * Get all users
- */
-export async function getUsers(): Promise<User[]> {
-  return apiGet<User[]>(BASE_PATH);
-}
-
-/**
  * Get a user by ID
  */
 export async function getUserById(id: string): Promise<User> {
@@ -50,18 +43,4 @@ export async function updateUser(id: string, data: UserRequest): Promise<User> {
  */
 export async function deleteUser(id: string): Promise<void> {
   return apiDelete<void>(`${BASE_PATH}/${id}`);
-}
-
-/**
- * Get the last audit date for a user
- */
-export async function getUserLastAudit(id: string): Promise<string | null> {
-  return apiGet<string | null>(`${BASE_PATH}/${id}/last-audit`);
-}
-
-/**
- * Get the last audit dates for all users in a single request
- */
-export async function getAllLastAudits(): Promise<Record<string, string>> {
-  return apiGet<Record<string, string>>(`${BASE_PATH}/last-audits`);
 }

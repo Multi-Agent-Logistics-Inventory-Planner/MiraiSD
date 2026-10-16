@@ -1,19 +1,22 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getUsers, getAllLastAudits } from "@/lib/api/users";
+import { skipToken, useQuery } from "@tanstack/react-query";
+import { useCurrentSite } from "@/hooks/queries/use-current-site";
+import { getSiteUsers, getSiteLastAudits } from "@/lib/api/site-users";
 import { getPendingInvitations } from "@/lib/api/invitations";
 import type { TeamMemberRow } from "@/components/team";
 import type { Invitation } from "@/types/api";
 
 export function useTeamData() {
-  return useQuery({
-    queryKey: ["team-data"],
-    queryFn: async () => {
+  const { siteId, isLoading: isSiteLoading } = useCurrentSite();
+
+  const query = useQuery({
+    queryKey: ["team-data", siteId],
+    queryFn: siteId ? async () => {
       const [usersData, invitationsData, lastAuditsData] = await Promise.all([
-        getUsers(),
+        getSiteUsers(siteId),
         getPendingInvitations().catch(() => [] as Invitation[]),
-        getAllLastAudits().catch(() => ({} as Record<string, string>)),
+        getSiteLastAudits(siteId).catch(() => ({} as Record<string, string>)),
       ]);
 
       const members: TeamMemberRow[] = usersData.map((user) => ({
@@ -39,6 +42,8 @@ export function useTeamData() {
       }));
 
       return [...members, ...invitations];
-    },
+    } : skipToken,
   });
+
+  return { ...query, isLoading: query.isLoading || isSiteLoading };
 }
